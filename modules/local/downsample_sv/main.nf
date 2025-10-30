@@ -1,9 +1,7 @@
-process FILTERCOV_SV {
+process DOWNSAMPLE_SV {
     tag "$meta.id"
     label 'process_medium'
-    
     container "community.wave.seqera.io/library/bcftools_pip_confargparse:4f3c18aa8341a070"
-    
     input:
     tuple val(meta), path(vcf), path(tbi)
     tuple val(meta2), path(mosdepth_summary)
@@ -11,23 +9,19 @@ process FILTERCOV_SV {
     val chromosome_codes
     val min_read_support
     val min_read_support_limit
-    val filter_pass
-    
+
     output:
     tuple val(meta), path("*.vcf.gz"), path("*.vcf.gz.tbi"), emit: filterbycov_vcf
     path "versions.yml", emit: versions
-    
     when:
     task.ext.when == null || task.ext.when
-    
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def output_name = "${prefix}"
     def ctgs = chromosome_codes.join(',')
     def ctgs_filter = "--contigs ${ctgs}"
-    def pass_filter_arg = filter_pass ? "--filter_pass" : "--no-filter_pass"
-    
+
     """
     # Filter bed file for callable regions - handle gzipped files directly
     if [[ "${target_bed}" != "OPTIONAL_FILE" ]]; then
@@ -43,7 +37,7 @@ process FILTERCOV_SV {
 
     # Use input VCF directly (already compressed with index)
     input_vcf="${vcf}"
-    
+
     # Verify index exists and is accessible
     if [[ ! -f "${tbi}" ]]; then
         echo "Error: Index file ${tbi} not found"
@@ -52,9 +46,9 @@ process FILTERCOV_SV {
 
     # Extract average depth from mosdepth summary
     AVG_DEPTH=\$(awk '\$1 == "total" {print \$4}' ${mosdepth_summary})
-    
+
     # Generate filtering command with PASS filter option
-    filterSV.py \\
+    wf_ont_filter.py \\
         --bcftools_threads ${task.cpus} \\
         --target_bedfile \$target_bed_arg \\
         --vcf \$input_vcf \\
@@ -62,15 +56,14 @@ process FILTERCOV_SV {
         --min_read_support ${min_read_support} \\
         --min_read_support_limit ${min_read_support_limit} \\
         ${ctgs_filter} \\
-        ${pass_filter_arg} \\
         ${args} > filter_command.sh
-    
+
     # Execute filtering and compress output with custom naming
     bash filter_command.sh | bcftools view -O z -o ${output_name}.vcf.gz
-    
+
     # Index the output VCF
     tabix -p vcf ${output_name}.vcf.gz
-    
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         bcftools: \$(bcftools --version 2>&1 | head -n1 | sed 's/bcftools //g')
@@ -78,7 +71,6 @@ process FILTERCOV_SV {
         python: \$(python --version | sed 's/Python //g')
     END_VERSIONS
     """
-    
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     def suffix = task.ext.suffix ?: "covFiltered"
@@ -86,7 +78,7 @@ process FILTERCOV_SV {
     """
     touch ${output_name}.vcf.gz
     touch ${output_name}.vcf.gz.tbi
-    
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         bcftools: \$(bcftools --version 2>&1 | head -n1 | sed 's/bcftools //g')

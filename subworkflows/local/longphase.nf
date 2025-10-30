@@ -2,7 +2,7 @@
 
 include { LONGPHASE_PHASE } from '../../modules/nf-core/longphase/phase/main.nf'
 
-workflow longphase_subworkflow {
+workflow longphase {
     take:
     ch_bam // channel: tuple(val(meta), path(bam), path(bai))
     ch_fasta // channel: tuple(val(meta2), path(fasta))

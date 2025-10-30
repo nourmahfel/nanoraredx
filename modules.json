@@ -100,6 +100,11 @@
                         "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",
                         "installed_by": ["modules"]
                     },
+                    "jasminesv": {
+                        "branch": "master",
+                        "git_sha": "a70dc7ed7cec3563561b19dec48277a43aad4dbf",
+                        "installed_by": ["modules"]
+                    },
                     "longphase/phase": {
                         "branch": "master",
                         "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",

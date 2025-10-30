@@ -24,34 +24,38 @@ include { alignment_subworkflow              } from '../subworkflows/local/align
 include { CAT_FASTQ                          } from '../modules/nf-core/cat/fastq/main.nf'
 include { NANOPLOT as NANOPLOT_QC            } from '../modules/nf-core/nanoplot/main'
 
-// Methylation calling 
-include { methyl_subworkflow                 } from '../subworkflows/local/methylation.nf'
+// Methylation calling
+include { methyl                             } from '../subworkflows/local/methyl.nf'
 
 // Coverage analysis subworkflows
-include { mosdepth_subworkflow               } from '../subworkflows/local/mosdepth.nf'
+include { mosdepth                           } from '../subworkflows/local/mosdepth.nf'
 
 // Structural variant calling subworkflows
-include { sv_subworkflow                     } from '../subworkflows/local/sv.nf'
-include { SVANNA_PRIORITIZE                  } from '../modules/local/SvAnna/main.nf'
+include { call_sv                            } from '../subworkflows/local/call_sv.nf'
+include { filter_sv as filter_sv_sniffles    } from '../subworkflows/local/filter_sv'
+include { filter_sv as filter_sv_svim        } from '../subworkflows/local/filter_sv'
+include { filter_sv as filter_sv_cutesv      } from '../subworkflows/local/filter_sv'
 
 // SV merging and intersection filtering subworkflows
 include { GUNZIP as GUNZIP_SNIFFLES          } from '../modules/nf-core/gunzip/main.nf'
-include { GUNZIP as GUNZIP_CUTESV            } from '../modules/nf-core/gunzip/main.nf'
 include { GUNZIP as GUNZIP_SVIM              } from '../modules/nf-core/gunzip/main.nf'
-include { consensuSV_subworkflow             } from '../subworkflows/local/consensuSV.nf'
+include { GUNZIP as GUNZIP_CUTESV            } from '../modules/nf-core/gunzip/main.nf'
+include { merge_sv                           } from '../subworkflows/local/merge_sv.nf'
+include { SVANNA_PRIORITIZE                  } from '../modules/local/SvAnna/main.nf'
 
 // SNV calling and processing subworkflows
-include { snv_subworkflow                    } from '../subworkflows/local/snv.nf'
+include { call_snv                           } from '../subworkflows/local/call_snv'
 include { merge_snv_subworkflow              } from '../subworkflows/local/merge_snv.nf'
 
 // Phasing subworkflow
-include { longphase_subworkflow              } from '../subworkflows/local/longphase.nf'
+include { longphase                          } from '../subworkflows/local/longphase.nf'
 
 // CNV calling subworkflows
-include { cnv_spectre_subworkflow                    } from '../subworkflows/local/cnv_spectre.nf'
-include { HIFICNV                                    } from '../modules/local/hificnv/main.nf'
+include { call_cnv_spectre                   } from '../subworkflows/local/call_cnv_spectre.nf'
+include { call_hificnv                        } from '../subworkflows/local/call_hificnv.nf'
+
 // STR analysis subworkflow
-include { str_subworkflow                    } from '../subworkflows/local/str.nf'
+include { call_str                           } from '../subworkflows/local/call_str.nf'
 
 // VCF processing subworkflows
 include { unify_vcf_subworkflow              } from '../subworkflows/local/unify_vcf.nf'
@@ -67,10 +71,10 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_nano
 workflow nanoraredx {
 
     main:
-    
+
     // Convert samplesheet to list and create channel using nf-schema
     def samplesheet_data = samplesheetToList(params.input, "assets/schema_input.json")
-    
+
     ch_samplesheet = Channel.fromList(samplesheet_data)
         .map { row ->
             // Handle the ArrayList structure from nf-schema
@@ -80,7 +84,7 @@ workflow nanoraredx {
                 def meta = [id: sample_id]
                 def data = [
                     bam_dir: row[1] ?: null,
-                    fastq_dir: row[2] ?: null, 
+                    fastq_dir: row[2] ?: null,
                     aligned_bam: row[3] ?: null,
                     methyl_bam: row[4] ?: null,
                     hpo_terms: row[5] ?: null
@@ -114,7 +118,7 @@ workflow nanoraredx {
         .join(ch_fai, by: 0)
         .map { meta, fasta, fai -> tuple(meta, fasta, fai) }
         .first()
-    
+
     // Tandem repeat file for Sniffles (only if SV calling is enabled)
     if (params.sv) {
         ch_trf = Channel
@@ -135,14 +139,14 @@ workflow nanoraredx {
         ================================================================================
                             FASTQ ALIGNMENT WORKFLOW
         ================================================================================
-        */ 
+        */
         // Collect FASTQ files
         ch_samplesheet.view()
         ch_fastq_files = ch_samplesheet
             .map { meta, data ->
                 def fastq_dir = file(data.fastq_dir)
-                def fastq_files = fastq_dir.listFiles().findAll { 
-                    it.name.endsWith('.fastq.gz') || it.name.endsWith('.fq.gz') 
+                def fastq_files = fastq_dir.listFiles().findAll {
+                    it.name.endsWith('.fastq.gz') || it.name.endsWith('.fq.gz')
                 }
                 return [meta, fastq_files]
             }
@@ -153,7 +157,7 @@ workflow nanoraredx {
                 [meta + [single_end: true], fastq_list]
             }
         )
-        
+
         // Align FASTQ reads to reference genome using minimap2
         alignment_subworkflow(
             ch_fasta,
@@ -162,7 +166,6 @@ workflow nanoraredx {
         )
 
         ch_versions = ch_versions.mix(alignment_subworkflow.out.versions)
-
 
         // Set final aligned BAM channels from minimap2 output
         ch_final_sorted_bam = alignment_subworkflow.out.bam
@@ -178,27 +181,36 @@ workflow nanoraredx {
                             ALIGNMENT WORKFLOW (UNALIGNED INPUT)
         ================================================================================
         */
-        
+
         // Collect unaligned BAM files
         ch_bam_files = ch_samplesheet
-            .map { meta, data ->
-                def bam_pattern = "${data.bam_dir}/*.bam"
-                def bam_files = file(bam_pattern)
-                
-                // Ensure bam_files is always a list
-                def bam_list = bam_files instanceof List ? bam_files : [bam_files]
-                
-                if (bam_list.isEmpty()) {
-                    error "No BAM files found for sample ${meta.id} in directory: ${data.bam_dir}"
-                }
-                
-                return [meta, bam_list]
+        .map { meta, data ->
+        def bam_input = data.bam_dir
+
+        if (bam_input.endsWith('.bam')) {
+            // Single BAM file case
+            def bam_file = file(bam_input, checkIfExists: true)
+            return [meta + [is_multiple: false], bam_file]
+        } else {
+            // Directory with multiple BAM files case
+            def bam_pattern = "${bam_input}/*.bam"
+            def bam_files = file(bam_pattern)
+
+            // Ensure bam_files is always a list
+            def bam_list = bam_files instanceof List ? bam_files : [bam_files]
+
+            if (bam_list.isEmpty()) {
+                error "No BAM files found for sample ${meta.id} in directory: ${bam_input}"
             }
+
+            return [meta + [is_multiple: bam_list.size() > 1], bam_list]
+        }
+    }
 
         // Convert BAM to FASTQ
         bam2fastq_subworkflow(
-            ch_bam_files, 
-            [[:], []], 
+            ch_bam_files,
+            [[:], []],
             [[:], []]
         )
 
@@ -211,14 +223,25 @@ workflow nanoraredx {
         )
 
         ch_versions = ch_versions.mix(alignment_subworkflow.out.versions)
+
         // Set final aligned BAM channels from minimap2 output
         ch_final_sorted_bam = alignment_subworkflow.out.bam
-        ch_final_sorted_bai = alignment_subworkflow.out.bai
+        .map { meta, bam ->
+        def clean_meta = [id: meta.id]  // Keep only the id field
+        [clean_meta, bam]
+        }
 
+        ch_final_sorted_bai = alignment_subworkflow.out.bai
+        .map { meta, bai ->
+        def clean_meta = [id: meta.id]  // Keep only the id field
+        [clean_meta, bai]
+        }
+
+        ch_final_sorted_bam.view()
         // Prepare input for nanoplot from FASTQ
         ch_nanoplot = bam2fastq_subworkflow.out.other
             .map { meta, fastq_file ->
-                tuple(meta, fastq_file) 
+                tuple(meta, fastq_file)
             }
 
     } else {
@@ -227,7 +250,7 @@ workflow nanoraredx {
                             ALIGNED INPUT WORKFLOW (ALIGNED BAM INPUT)
         ================================================================================
         */
-        
+
         // For aligned BAM input
         ch_aligned_input = ch_samplesheet
             .map { meta, data ->
@@ -239,7 +262,7 @@ workflow nanoraredx {
         // Use this single channel for all downstream processes
         ch_final_sorted_bam = ch_aligned_input.map { meta, bam, bai -> [meta, bam] }
         ch_final_sorted_bai = ch_aligned_input.map { meta, bam, bai -> [meta, bai] }
-        
+
         // For nanoplot, we'll skip it (no FASTQ available)
         ch_nanoplot = ch_final_sorted_bam
     }
@@ -249,12 +272,12 @@ workflow nanoraredx {
                                 COVERAGE ANALYSIS
 =======================================================================================
 */
-    
+
     // Prepare input channel with BAM, BAI, and optional BED file for coverage analysis
     ch_input_bam_bai_bed = ch_final_sorted_bam
         .join(ch_final_sorted_bai, by: 0)
         .map { meta, bam, bai ->
-            def bed = params.bed_file ? file(params.bed_file) : []
+            def bed = params.target_bed ? file(params.target_bed) : []
             tuple(meta, bam, bai, bed)
         }
 
@@ -271,7 +294,7 @@ workflow nanoraredx {
         )
         ch_versions = ch_versions.mix(BAM_STATS_SAMTOOLS.out.versions)
     }
-    
+
     // Run nanoplot (only if we have FASTQ data from alignment workflow)
     if (params.qc) {
         NANOPLOT_QC(
@@ -279,21 +302,21 @@ workflow nanoraredx {
         )
         ch_versions = ch_versions.mix(NANOPLOT_QC.out.versions)
     }
-    
+
     // Run mosdepth when needed
-    if (params.sv || params.cnv_spectre || params.generate_coverage) {
-        mosdepth_subworkflow(
+    if (params.downsample_sv || params.generate_coverage) {
+        mosdepth(
             ch_input_bam_bai_bed,
             [[:], []]
         )
-        ch_versions = ch_versions.mix(mosdepth_subworkflow.out.versions)
+        ch_versions = ch_versions.mix(mosdepth.out.versions)
     }
-
 
     if (params.methyl) {
         if (params.align_with_bam) {
             // Use workflow-generated BAM for methylation analysis
             ch_methyl_input = ch_input_bam
+            ch_methyl_input.view()
         } else {
             // For align_with_fastq or no alignment: use methylated BAM from path
             ch_methyl_input = ch_samplesheet
@@ -306,13 +329,13 @@ workflow nanoraredx {
                     return [meta, bam_file, bai_file]
                 }
         }
-        
-        methyl_subworkflow(
+
+        methyl(
             ch_methyl_input,
             ch_fasta_fai,
             [[:], []]
         )
-        ch_versions = ch_versions.mix(methyl_subworkflow.out.versions)
+        ch_versions = ch_versions.mix(methyl.out.versions)
     }
 
 /*
@@ -321,143 +344,228 @@ workflow nanoraredx {
 =======================================================================================
 */
 
-    if (params.sv) {
+if (params.sv) {
+    /*
+    ================================================================================
+                            PARALLEL SV CALLER EXECUTION
+    ================================================================================
+    */
+
+    // Run SV calling subworkflow
+    call_sv(
+        ch_input_bam,
+        ch_fasta,
+        ch_trf,
+        params.vcf_output,
+        params.snf_output
+    )
+    ch_versions = ch_versions.mix(call_sv.out.versions)
+
+    // Initialize SV VCF channels WITH CALLER INFO in metadata
+    ch_sniffles_vcf = call_sv.out.sniffles_vcf
+    ch_svim_vcf = call_sv.out.svim_vcf
+    ch_cutesv_vcf = call_sv.out.cutesv_vcf
+
+
+    /*
+    ================================================================================
+                            OPTIONAL SV FILTERING
+    ================================================================================
+    */
+
+        if (params.filter_sv_pass) {
+        // Filter SVs for each caller separately - caller info automatically preserved
+        filter_sv_sniffles(
+        call_sv.out.sniffles_vcf_tbi.map { meta, vcf, tbi ->
+            [meta + [caller: 'sniffles'], vcf, tbi]
+        },
+        params.target_bed,
+        params.downsample_sv,
+        mosdepth.out.summary_txt,
+        mosdepth.out.quantized_bed,
+        params.chromosome_codes,
+        params.min_read_support,
+        params.min_read_support_limit
+    )
+
+    filter_sv_svim(
+        call_sv.out.svim_vcf_tbi.map { meta, vcf, tbi ->
+            [meta + [caller: 'svim'], vcf, tbi]
+        },
+        params.target_bed,
+        params.downsample_sv,
+        mosdepth.out.summary_txt,
+        mosdepth.out.quantized_bed,
+        params.chromosome_codes,
+        params.min_read_support,
+        params.min_read_support_limit
+    )
+
+    filter_sv_cutesv(
+        call_sv.out.cutesv_vcf_tbi.map { meta, vcf, tbi ->
+            [meta + [caller: 'cutesv'], vcf, tbi]
+        },
+        params.target_bed,
+        params.downsample_sv,
+        mosdepth.out.summary_txt,
+        mosdepth.out.quantized_bed,
+        params.chromosome_codes,
+        params.min_read_support,
+        params.min_read_support_limit
+    )
+
+        // Update channels to use filtered results (caller info preserved automatically)
+        ch_sniffles_vcf = filter_sv_sniffles.out.ch_vcf_tbi.map { meta, vcf, tbi -> [meta, vcf] }
+        ch_svim_vcf = filter_sv_svim.out.ch_vcf_tbi.map { meta, vcf, tbi -> [meta, vcf] }
+        ch_cutesv_vcf = filter_sv_cutesv.out.ch_vcf_tbi.map { meta, vcf, tbi -> [meta, vcf] }
+
+        ch_versions = ch_versions.mix(filter_sv_sniffles.out.versions)
+        ch_versions = ch_versions.mix(filter_sv_svim.out.versions)
+        ch_versions = ch_versions.mix(filter_sv_cutesv.out.versions)
+    }
+
+    /*
+    ================================================================================
+                        CONDITIONAL SV MERGING OR INDIVIDUAL PROCESSING
+    ================================================================================
+    */
+
+    if (params.merge_sv) {
         /*
-        ================================================================================
-                                PARALLEL SV CALLER EXECUTION
-        ================================================================================
+        ========================================================================
+                            SV MERGING WITH JASMINESV
+        ========================================================================
         */
-        
-        // Run SV calling subworkflow
-        sv_subworkflow(
-            ch_input_bam,
-            ch_fasta,
-            ch_trf,
-            params.vcf_output,
-            params.snf_output,
-            params.primary_sv_caller,
-            params.filter_sv,
-            mosdepth_subworkflow.out.summary_txt,
-            mosdepth_subworkflow.out.quantized_bed,
-            params.chromosome_codes ?: 'chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX,chrY',
-            params.min_read_support ?: 'auto',
-            params.min_read_support_limit ?: 3,
-            params.filter_pass_sv ?: false
-        )
 
-        ch_versions = ch_versions.mix(sv_subworkflow.out.versions)
+        // Gunzip VCFs for Jasmine (requires uncompressed input)
+        GUNZIP_SNIFFLES(ch_sniffles_vcf)
+        GUNZIP_SVIM(ch_svim_vcf)
+        GUNZIP_CUTESV(ch_cutesv_vcf)
+        ch_versions = ch_versions.mix(GUNZIP_SNIFFLES.out.versions)
+        ch_versions = ch_versions.mix(GUNZIP_SVIM.out.versions)
+        ch_versions = ch_versions.mix(GUNZIP_CUTESV.out.versions)
 
-        // Extract VCF from the sv_gz_tbi channel for unify_vcf_subworkflow
-        ch_sv_vcf = sv_subworkflow.out.primary_vcf_gz
-
-        /*
-        ================================================================================
-                            MULTI-CALLER FILTERING AND CONSENSUS
-        ================================================================================
-        */
-        
-        if (params.consensuSV) {
-            // Prepare VCFs for SURVIVOR merging - direct from subworkflow outputs
-            ch_vcfs_for_merging = GUNZIP_SNIFFLES(sv_subworkflow.out.sniffles_vcf_gz).gunzip
-                .map { meta, vcf -> 
-                    [meta.id, vcf, 'sniffles'] 
-                }
-                .mix(
-                    GUNZIP_CUTESV(sv_subworkflow.out.cutesv_vcf_gz).gunzip
-                        .filter { meta, vcf -> vcf && vcf.exists() }
-                        .map { meta, vcf -> 
-                            [meta.id, vcf, 'cutesv'] 
-                        }
-                )
-                .mix(
-                    GUNZIP_SVIM(sv_subworkflow.out.svim_vcf_gz).gunzip
-                        .filter { meta, vcf -> vcf && vcf.exists() }
-                        .map { meta, vcf -> 
-                            [meta.id, vcf, 'svim'] 
-                        }
-                )
-                .groupTuple(by: 0)
-                .map { sample_id, vcfs, callers ->
-                    def meta = [id: sample_id, callers: callers]
-                    [meta, vcfs]
-                }
-
-            ch_versions = ch_versions.mix(GUNZIP_SNIFFLES.out.versions)
-            ch_versions = ch_versions.mix(GUNZIP_CUTESV.out.versions)
-            ch_versions = ch_versions.mix(GUNZIP_SVIM.out.versions)
-
-            // Group by meta to ensure we're merging files from the same sample
-            ch_merge_input = sv_subworkflow.out.sniffles_vcf_gz
-                .join(sv_subworkflow.out.sniffles_tbi, by: 0)
-                .join(sv_subworkflow.out.svim_vcf_gz, by: 0)
-                .join(sv_subworkflow.out.svim_tbi, by: 0)
-                .join(sv_subworkflow.out.cutesv_vcf_gz, by: 0)
-                .join(sv_subworkflow.out.cutesv_tbi, by: 0)
-                .map { meta, sniffles_vcf, sniffles_tbi, svim_vcf, svim_tbi, cutesv_vcf, cutesv_tbi ->
-                    tuple(meta, 
-                        [sniffles_vcf, svim_vcf, cutesv_vcf], 
-                        [sniffles_tbi, svim_tbi, cutesv_tbi])
-                }
-
-            // Run multi-caller filtering
-            consensuSV_subworkflow(
-                ch_vcfs_for_merging,
-                ch_merge_input,
-                params.use_survivor_bed
+        // Prepare input for JASMINESV - group all uncompressed VCFs by sample
+        jasmine_input_ch = GUNZIP_SNIFFLES.out.gunzip
+            .map { meta, vcf -> [[id: meta.id], vcf] }
+            .join(
+                GUNZIP_SVIM.out.gunzip.map { meta, vcf -> [[id: meta.id], vcf] },
+                by: 0
             )
-            ch_versions = ch_versions.mix(consensuSV_subworkflow.out.versions)
+            .join(
+                GUNZIP_CUTESV.out.gunzip.map { meta, vcf -> [[id: meta.id], vcf] },
+                by: 0
+            )
+            .map { sample_key, sniffles_vcf, svim_vcf, cutesv_vcf ->
+                [sample_key, [sniffles_vcf, svim_vcf, cutesv_vcf]]
+            }
+            .join(
+                ch_input_bam.map { meta, bam, bai -> [[id: meta.id], bam, bai] },
+                by: 0
+            )
+            .map { sample_key, vcfs, bam, bai ->
+                def clean_meta = [id: sample_key.id]
+                [clean_meta, vcfs, bam, bai, []]  // [meta, vcfs, bam, bai, sample_dists]
+            }
 
+        // Run JASMINESV merging
+        merge_sv(
+            jasmine_input_ch,
+            ch_fasta,
+            ch_fai,
+            []
+        )
+        ch_versions = ch_versions.mix(merge_sv.out.versions)
 
-            ch_sv_vcf = consensuSV_subworkflow.out.vcf
-                .map { meta, vcf_gz -> 
-                    def clean_meta = [id: meta.id]
-                    tuple(clean_meta, vcf_gz) 
-                }
+        // Set final SV VCF to merged result
+        ch_sv_vcf_final = merge_sv.out.vcf
+            .map { meta, vcf -> [meta + [caller: 'merged'], vcf] }
+
+    } else {
+        /*
+        ========================================================================
+                        INDIVIDUAL CALLER SELECTION (NO MERGING)
+        ========================================================================
+        */
+
+        // Select VCF based on priority or parameter
+        if (params.sv_vcf == 'sniffles') {
+            ch_sv_vcf_final = ch_sniffles_vcf
+                .map { meta, vcf -> [meta + [caller: 'sniffles'], vcf] }
+        } else if (params.sv_vcf == 'svim') {
+            ch_sv_vcf_final = ch_svim_vcf
+                .map { meta, vcf -> [meta + [caller: 'svim'], vcf] }
+        } else if (params.sv_vcf == 'cutesv') {
+            ch_sv_vcf_final = ch_cutesv_vcf
+                .map { meta, vcf -> [meta + [caller: 'cutesv'], vcf] }
+        } else {
+            // Default to Sniffles if parameter not recognized
+            ch_sv_vcf_final = ch_sniffles_vcf
+                .map { meta, vcf -> [meta + [caller: 'sniffles'], vcf] }
         }
+    }
 
-        if (params.annotate_sv) {
-    
+    /*
+    ================================================================================
+                            SV ANNOTATION WITH SVANNA
+    ================================================================================
+    */
+
+    if (params.annotate_sv) {
         // Filter samplesheet to only include samples with HPO terms
-    
-            ch_samplesheet_with_hpo = ch_samplesheet
+        ch_samplesheet_with_hpo = ch_samplesheet
             .filter { meta, data ->
                 data.hpo_terms && data.hpo_terms.trim() != ""
             }
-    
-            // Create a separate channel for samples without HPO terms (optional, for logging)
-        ch_samplesheet_no_hpo = ch_samplesheet
-        .filter { meta, data ->
-            !data.hpo_terms || data.hpo_terms.trim() == ""
-        }
-        // Log which samples will be skipped
-    
-        ch_samplesheet_no_hpo.view { meta, data ->
-        "SKIPPING sample ${meta.id} - no HPO terms provided"
-        }
-    
-         ch_hpo_terms = ch_samplesheet_with_hpo.map { meta, data -> 
-         [meta, data.hpo_terms] }
 
-        // Only process VCFs from samples that have HPO terms
-    
-        ch_sv_vcf_filtered = ch_sv_vcf
-            .join(ch_hpo_terms, by: 0)  // This join will only include samples with HPO terms
+        ch_hpo_terms = ch_samplesheet_with_hpo.map { meta, data ->
+            [meta, data.hpo_terms]
+        }
 
+        // Prepare VCF for annotation with HPO terms
+        ch_sv_vcf_for_annotation = ch_sv_vcf_final
+            .map { meta, vcf -> [meta.id, vcf, meta.caller] }
+            .join(ch_hpo_terms.map { meta, hpo -> [meta.id, hpo] }, by: 0)
+            .map { sample_id, vcf, caller, hpo_terms ->
+                def meta = [id: sample_id, caller: caller]
+                [meta, vcf, hpo_terms]
+            }
+
+        // Set up SvAnna database
         ch_svanna_db = Channel
             .fromPath(params.svanna_db, checkIfExists: true)
             .first()
 
+        // Run SvAnna prioritization
         SVANNA_PRIORITIZE(
-            ch_sv_vcf_filtered.map { meta, vcf, hpo_terms -> [meta, vcf] },
+            ch_sv_vcf_for_annotation.map { meta, vcf, hpo_terms -> [meta, vcf] },
             ch_svanna_db,
-            ch_sv_vcf_filtered.map { meta, vcf, hpo_terms -> hpo_terms }
+            ch_sv_vcf_for_annotation.map { meta, vcf, hpo_terms -> hpo_terms }
         )
         ch_versions = ch_versions.mix(SVANNA_PRIORITIZE.out.versions)
-    
-        }
+    }
 
-    } else {
-        ch_sv_vcf = Channel.empty()
+    /*
+    ================================================================================
+                        SET DOWNSTREAM SV VCF CHANNEL
+    ================================================================================
+    */
+
+    // Set the final SV VCF channel for downstream processes
+    ch_sv_vcf_downstream = ch_sv_vcf_final
+
+    }
+
+    else {
+    /*
+    ================================================================================
+                        SV CALLING DISABLED - EMPTY CHANNELS
+    ================================================================================
+    */
+
+    ch_sv_vcf_downstream = Channel.empty()
+    ch_sv_vcf_final = Channel.empty()
+
     }
 /*
 ================================================================================
@@ -477,9 +585,9 @@ workflow nanoraredx {
                 params.clair3_platform
             )
         }
-        
+
         // Run SNV calling
-        snv_subworkflow(
+        call_snv (
             ch_input_bam_clair3,
             ch_fasta,
             ch_fai,
@@ -488,17 +596,17 @@ workflow nanoraredx {
             params.filter_pass_snv
         )
 
-        ch_versions = ch_versions.mix(snv_subworkflow.out.versions)
+        ch_versions = ch_versions.mix(call_snv.out.versions)
 
-        ch_snv_vcf = snv_subworkflow.out.clair3_vcf
-        ch_snv_tbi = snv_subworkflow.out.clair3_tbi
+        ch_snv_vcf = call_snv.out.clair3_vcf
+        ch_snv_tbi = call_snv.out.clair3_tbi
 
         if (params.merge_snv && params.deepvariant) {
             combined_vcfs = ch_snv_vcf
                 .join(ch_snv_tbi, by: 0)
                 .join(
-                    snv_subworkflow.out.deepvariant_vcf
-                        .join(snv_subworkflow.out.deepvariant_tbi, by: 0), 
+                    call_snv.out.deepvariant_vcf
+                        .join(call_snv.out.deepvariant_tbi, by: 0),
                     by: 0
                 )
                 .map { meta, clair3_vcf, clair3_tbi, deepvariant_vcf, deepvariant_tbi ->
@@ -508,7 +616,7 @@ workflow nanoraredx {
                         [clair3_tbi, deepvariant_tbi]
                     ]
                 }
-        
+
             // Merge SNV VCFs
             merge_snv_subworkflow(combined_vcfs)
             ch_versions = ch_versions.mix(merge_snv_subworkflow.out.versions)
@@ -527,31 +635,38 @@ workflow nanoraredx {
 
     // Run phasing with LongPhase if enabled
     if (params.phase && params.snv) {
-        if (params.sv && params.phase_with_sv) {
-            // Phasing with both SNVs and SVs
-            ch_longphase_input = ch_input_bam
-                .join(ch_snv_vcf, by: 0)
-                .join(ch_sv_vcf, by: 0)
-                .map { meta, bam, bai, snv_vcf, sv_vcf -> 
-                    tuple(meta, bam, bai, snv_vcf, sv_vcf, []) 
-                }
-        } else {
-            // Phasing with SNVs only
-            ch_longphase_input = ch_input_bam
-                .join(ch_snv_vcf, by: 0)
-                .map { meta, bam, bai, snv_vcf -> 
-                    tuple(meta, bam, bai, snv_vcf, [], []) 
-                }   
-        }
-
-        longphase_subworkflow(
-            ch_longphase_input,
-            ch_fasta,
-            ch_fai
-        )
-         ch_versions = ch_versions.mix(longphase_subworkflow.out.versions)
+    if (params.sv && params.phase_with_sv) {
+        // Clean all metadata to just sample ID for joining
+        ch_longphase_input = ch_input_bam
+            .map { meta, bam, bai -> [[id: meta.id], meta, bam, bai] }
+            .join(
+                ch_snv_vcf.map { meta, vcf -> [[id: meta.id], vcf] },
+                by: 0
+            )
+            .join(
+                ch_sv_vcf_final.map { meta, vcf -> [[id: meta.id], vcf] },
+                by: 0
+            )
+            .map { sample_key, original_meta, bam, bai, snv_vcf, sv_vcf ->
+                tuple(original_meta, bam, bai, snv_vcf, sv_vcf, [])
+            }
+    } else {
+        // Phasing with SNVs only
+        ch_longphase_input = ch_input_bam
+            .join(ch_snv_vcf, by: 0)
+            .map { meta, bam, bai, snv_vcf ->
+                tuple(meta, bam, bai, snv_vcf, [], [])
+            }
     }
 
+    longphase(
+        ch_longphase_input,
+        ch_fasta,
+        ch_fai
+    )
+    ch_versions = ch_versions.mix(longphase.out.versions)
+
+    }
 /*
 =======================================================================================
                         COPY NUMBER VARIANT CALLING
@@ -569,45 +684,46 @@ workflow nanoraredx {
             .map { meta, data -> meta.id }  // Extract sample ID from samplesheet
             .combine(Channel.fromPath(params.spectre_test_clair3_vcf, checkIfExists: true))
             .combine(Channel.fromPath(params.spectre_test_fasta_file, checkIfExists: true))
-            .map { sample_id, vcf_file, fasta -> 
+            .map { sample_id, vcf_file, fasta ->
             def meta = [id: sample_id]
             tuple(meta, fasta)
             }
-            
-            cnv_spectre_subworkflow(
+            ch_spectre_test_reference.view()
+
+            call_cnv_spectre(
                 params.spectre_test_mosdepth,
                 ch_spectre_test_reference,
                 params.spectre_test_clair3_vcf,
                 params.spectre_metadata,
                 params.spectre_blacklist
             )
-            ch_spectre_vcf = cnv_spectre_subworkflow.out.vcf
-            ch_versions = ch_versions.mix(cnv_spectre_subworkflow.out.versions)
-        } 
-        
+            ch_spectre_vcf = call_cnv_spectre.out.vcf
+            ch_versions = ch_versions.mix(call_cnv_spectre.out.versions)
+        }
+
         else {
 
         ch_combined = ch_snv_vcf
-        .join(mosdepth_subworkflow.out.regions_bed, by: 0)
+        .join(mosdepth.out.regions_bed, by: 0)
         // Result: [meta, vcf_file, bed_file]
-  
+
         // Transform for cnv_subworkflow - assuming it expects separate channels
         ch_spectre_bed = ch_combined.map { meta, vcf, bed -> bed }
         ch_spectre_vcf = ch_combined.map { meta, vcf, bed -> vcf }
 
         ch_spectre_reference = ch_samplesheet
-        .map { meta, data -> meta.id }  
+        .map { meta, data -> meta.id }
         .join(
-            ch_combined.map { meta, vcf, bed -> [meta.id, vcf] },  
+            ch_combined.map { meta, vcf, bed -> [meta.id, vcf] },
             by: 0
         )  // Combine with VCF
-        .combine(Channel.fromPath(params.fasta_file, checkIfExists: true))  
-        .map { sample_id, vcf_file, fasta -> 
+        .combine(Channel.fromPath(params.fasta_file, checkIfExists: true))
+        .map { sample_id, vcf_file, fasta ->
             def meta = [id: sample_id]
             tuple(meta, fasta)
         }
-        
-        cnv_spectre_subworkflow(
+
+        call_cnv_spectre(
         ch_spectre_bed,
         ch_spectre_reference,
         ch_spectre_vcf,
@@ -615,27 +731,27 @@ workflow nanoraredx {
         params.spectre_blacklist
         )
 
-        ch_spectre_vcf = cnv_spectre_subworkflow.out.vcf
-        ch_versions = ch_versions.mix(cnv_spectre_subworkflow.out.versions)
+        ch_spectre_vcf = call_cnv_spectre.out.vcf
+        ch_versions = ch_versions.mix(call_cnv_spectre.out.versions)
         }
 
-    } 
+    }
 
     if (params.cnv_hificnv){
-        
-        HIFICNV(
+
+        call_hificnv(
             ch_input_bam,
             ch_fasta,
             params.exclude_bed_hificnv
         )
-        ch_hificnv_vcf = HIFICNV.out.vcf
-        ch_versions = ch_versions.mix(HIFICNV.out.versions)
+        ch_hificnv_vcf = call_hificnv.out.vcf
+        ch_versions = ch_versions.mix(call_hificnv.out.versions)
     }
 
-    ch_cnv_vcf = params.cnv_spectre ? ch_spectre_vcf : 
-             params.cnv_hificnv ? ch_hificnv_vcf : 
+    ch_cnv_vcf = params.cnv_spectre ? ch_spectre_vcf :
+             params.cnv_hificnv ? ch_hificnv_vcf :
              Channel.empty()
-    
+
 
 
 /*
@@ -645,30 +761,30 @@ workflow nanoraredx {
 */
 
     if (params.str) {
-        str_subworkflow(
+        call_str (
             ch_input_bam,
             ch_fasta,
             params.str_bed_file
         )
-        ch_str_vcf = str_subworkflow.out.vcf
-        ch_versions = ch_versions.mix(str_subworkflow.out.versions)
+        ch_str_vcf = call_str.out.vcf
+        ch_versions = ch_versions.mix(call_str.out.versions)
     } else {
         ch_str_vcf = Channel.empty()
     }
-  
+
 /*
 ================================================================================
-                             VCF UNIFICATION 
+                             VCF UNIFICATION
 ================================================================================
 */
 
     if (params.unify_geneyx) {
 
-        ch_combined = ch_sv_vcf
+        ch_combined = ch_sv_vcf_final
         .join(ch_cnv_vcf, by: 0, remainder: true)
         .join(ch_str_vcf, by: 0, remainder: true)
 
-        
+
         unify_vcf_subworkflow(
         ch_combined.map { meta, sv, cnv, str -> [meta, sv] },
         ch_combined.map { meta, sv, cnv, str -> [meta, cnv ?: []] },
@@ -677,7 +793,7 @@ workflow nanoraredx {
 
     )
     ch_versions = ch_versions.mix(unify_vcf_subworkflow.out.versions)
-    
+
 
     //  unify_vcf_subworkflow(
         //     params.sv ? ch_sv_vcf : Channel.value([[:], []]),
@@ -687,7 +803,6 @@ workflow nanoraredx {
         // )
 
     }
-
     softwareVersionsToYAML(ch_versions)
     .collectFile(
         storeDir: "${params.outdir}/pipeline_info",
@@ -696,7 +811,7 @@ workflow nanoraredx {
         newLine: true
     ).set { ch_collated_versions }
 
-
+    // ch_collated_versions = Channel.empty()
 emit:
     versions = ch_collated_versions
 

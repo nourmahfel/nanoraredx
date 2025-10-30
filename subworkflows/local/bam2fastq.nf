@@ -4,34 +4,43 @@ include { SAMTOOLS_MERGE } from '../../modules/nf-core/samtools/merge/main'
 include { SAMTOOLS_FASTQ } from '../../modules/nf-core/samtools/fastq/main'
 
 workflow bam2fastq_subworkflow {
-    
+
     take:
     ch_bam_files    // channel: [ meta, [ bam1, bam2, ... ] ]
     ch_fasta        // channel: [ meta, fasta ] (optional)
     ch_fai          // channel: [ meta, fai ] (optional)
-    
+
     main:
     ch_versions = Channel.empty()
-    
-    // Handle optional inputs - use empty if not provided
-    // ch_fasta_final = ch_fasta ?: ([[:], []])
-    // ch_fai_final = ch_fai ?: ([[:], []])
-    
-    // Run samtools merge
+
+    ch_bam_files
+    .branch { meta, bam_files ->
+        multiple_bams: meta.is_multiple == true
+            return [meta, bam_files]
+        single_bam: meta.is_multiple == false
+            def single_bam = bam_files instanceof List ? bam_files[0] : bam_files
+            return [meta, single_bam, []]
+    }
+    .set { branched_bams }
+
     SAMTOOLS_MERGE (
-        ch_bam_files,
+        branched_bams.multiple_bams,
         ch_fasta,
         ch_fai
     )
     ch_versions = ch_versions.mix(SAMTOOLS_MERGE.out.versions)
 
+    ch_bams_for_fastq = SAMTOOLS_MERGE.out.bam
+        .mix(branched_bams.single_bam)
+
     SAMTOOLS_FASTQ(
-        SAMTOOLS_MERGE.out.bam,
+        ch_bams_for_fastq,
         false  // interleave parameter set to false
     )
+
     ch_versions = ch_versions.mix(SAMTOOLS_FASTQ.out.versions)
-    
-    
+
+
 
 emit:
     fastq       = SAMTOOLS_FASTQ.out.fastq       // channel: [meta, [fastq_1, fastq_2]] - paired-end files

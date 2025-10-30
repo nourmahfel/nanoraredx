@@ -3,10 +3,10 @@
 include { SPECTRE } from '../../modules/local/spectre/main'
 include { ROUND_DP } from '../../modules/local/round_dp/main'
 include { BCFTOOLS_SORT as BCFTOOLS_SORT_SPECTRE } from '../../modules/nf-core/bcftools/sort'
-include { TABIX_BGZIPTABIX as TABIX_BGZIPTABIX_SPECTRE} from '../../modules/nf-core/tabix/bgziptabix/main.nf'
 
 
-workflow cnv_spectre_subworkflow {
+
+workflow call_cnv_spectre {
     take:
     ch_mosdepth_output    // channel: [ val(meta), path(mosdepth_dir) ]
     ch_reference          // channel: [ val(meta2), path(fasta) ]
@@ -30,13 +30,13 @@ workflow cnv_spectre_subworkflow {
     )
 
     ch_versions = ch_versions.mix(SPECTRE.out.versions)
-    
+
     ROUND_DP(SPECTRE.out.vcf)
 
     ch_versions = ch_versions.mix(ROUND_DP.out.versions)
 
     BCFTOOLS_SORT_SPECTRE(ROUND_DP.out.vcf)
-    
+
    ch_versions = ch_versions.mix(BCFTOOLS_SORT_SPECTRE.out.versions)
 
     emit:
