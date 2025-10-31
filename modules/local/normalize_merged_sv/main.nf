@@ -45,6 +45,8 @@ process NORMALIZE_JASMINE {
 ##INFO=<ID=STRANDS,Number=1,Type=String,Description="Strand orientation for adjacencies (e.g., ++,+-,-+,--)">
 ##INFO=<ID=SUPPORT,Number=1,Type=Integer,Description="Read support">
 ##INFO=<ID=SUPPORT_LONG,Number=1,Type=Integer,Description="Long-read support">
+##INFO=<ID=SUPPORT_SA,Number=1,Type=Integer,Description="Number of supplementary/secondary alignments supporting the variant">
+##INFO=<ID=VAF,Number=1,Type=Float,Description="Variant Allele Frequency">
 ##INFO=<ID=COVERAGE,Number=1,Type=Integer,Description="Coverage at site">
 ##INFO=<ID=STDEV_LEN,Number=1,Type=Float,Description="Std dev of variant length across callers">
 ##INFO=<ID=STDEV_POS,Number=1,Type=Float,Description="Std dev of breakpoint position across callers">

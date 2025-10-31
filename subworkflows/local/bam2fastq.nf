@@ -14,14 +14,15 @@ workflow bam2fastq_subworkflow {
     ch_versions = Channel.empty()
 
     ch_bam_files
-    .branch { meta, bam_files ->
-        multiple_bams: meta.is_multiple == true
-            return [meta, bam_files]
-        single_bam: meta.is_multiple == false
-            def single_bam = bam_files instanceof List ? bam_files[0] : bam_files
-            return [meta, single_bam, []]
-    }
-    .set { branched_bams }
+        .branch { meta, bam_files ->
+            multiple_bams: meta.is_multiple == true
+                return [meta, bam_files]
+            single_bam: meta.is_multiple == false
+                def single_bam = bam_files instanceof List ? bam_files[0] : bam_files
+                def clean_meta = [id: meta.id]
+                return [clean_meta, single_bam]
+        }
+        .set { branched_bams }
 
     SAMTOOLS_MERGE (
         branched_bams.multiple_bams,

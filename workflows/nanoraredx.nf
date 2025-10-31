@@ -83,9 +83,9 @@ workflow nanoraredx {
                 def sample_id = meta_map.id ?: meta_map.toString()
                 def meta = [id: sample_id]
                 def data = [
-                    bam_dir: row[1] ?: null,
+                    ubam: row[1] ?: null,
                     fastq_dir: row[2] ?: null,
-                    aligned_bam: row[3] ?: null,
+                    bam: row[3] ?: null,
                     methyl_bam: row[4] ?: null,
                     hpo_terms: row[5] ?: null
                 ]
@@ -183,29 +183,33 @@ workflow nanoraredx {
         */
 
         // Collect unaligned BAM files
+        // Collect unaligned BAM files
         ch_bam_files = ch_samplesheet
-        .map { meta, data ->
-        def bam_input = data.bam_dir
+            .map { meta, data ->
+                def bam_input = data.ubam
 
-        if (bam_input.endsWith('.bam')) {
-            // Single BAM file case
-            def bam_file = file(bam_input, checkIfExists: true)
-            return [meta + [is_multiple: false], bam_file]
-        } else {
-            // Directory with multiple BAM files case
-            def bam_pattern = "${bam_input}/*.bam"
-            def bam_files = file(bam_pattern)
+                if (!bam_input) {
+            error "No BAM input provided for sample ${meta.id}"
+                }
 
-            // Ensure bam_files is always a list
-            def bam_list = bam_files instanceof List ? bam_files : [bam_files]
+                def bam_path = file(bam_input)
 
-            if (bam_list.isEmpty()) {
-                error "No BAM files found for sample ${meta.id} in directory: ${bam_input}"
+                if (bam_path.isFile() && bam_path.name.endsWith('.bam')) {
+                    // Single BAM file case
+                    return [meta + [is_multiple: false], bam_path]
+                } else if (bam_path.isDirectory()) {
+                   // Directory with multiple BAM files case
+                    def bam_files = bam_path.listFiles().findAll { it.name.endsWith('.bam') }
+
+                    if (bam_files.isEmpty()) {
+                        error "No BAM files found for sample ${meta.id} in directory: ${bam_input}"
+                    }
+
+                    return [meta + [is_multiple: bam_files.size() > 1], bam_files]
+                } else {
+                    error "Invalid BAM input for sample ${meta.id}: ${bam_input} (not a file or directory)"
+                }
             }
-
-            return [meta + [is_multiple: bam_list.size() > 1], bam_list]
-        }
-    }
 
         // Convert BAM to FASTQ
         bam2fastq_subworkflow(
@@ -237,7 +241,7 @@ workflow nanoraredx {
         [clean_meta, bai]
         }
 
-        ch_final_sorted_bam.view()
+
         // Prepare input for nanoplot from FASTQ
         ch_nanoplot = bam2fastq_subworkflow.out.other
             .map { meta, fastq_file ->
@@ -254,8 +258,8 @@ workflow nanoraredx {
         // For aligned BAM input
         ch_aligned_input = ch_samplesheet
             .map { meta, data ->
-                def bam_file = file(data.aligned_bam, checkIfExists: true)
-                def bai_file = file("${data.aligned_bam}.bai", checkIfExists: true)
+                def bam_file = file(data.bam, checkIfExists: true)
+                def bai_file = file("${data.bam}.bai", checkIfExists: true)
                 return [meta, bam_file, bai_file]
             }
 
@@ -489,13 +493,13 @@ if (params.sv) {
         */
 
         // Select VCF based on priority or parameter
-        if (params.sv_vcf == 'sniffles') {
+        if (params.sv_caller == 'sniffles') {
             ch_sv_vcf_final = ch_sniffles_vcf
                 .map { meta, vcf -> [meta + [caller: 'sniffles'], vcf] }
-        } else if (params.sv_vcf == 'svim') {
+        } else if (params.sv_caller == 'svim') {
             ch_sv_vcf_final = ch_svim_vcf
                 .map { meta, vcf -> [meta + [caller: 'svim'], vcf] }
-        } else if (params.sv_vcf == 'cutesv') {
+        } else if (params.sv_caller == 'cutesv') {
             ch_sv_vcf_final = ch_cutesv_vcf
                 .map { meta, vcf -> [meta + [caller: 'cutesv'], vcf] }
         } else {
@@ -764,7 +768,8 @@ if (params.sv) {
         call_str (
             ch_input_bam,
             ch_fasta,
-            params.str_bed_file
+            params.str_bed_file,
+            params.variant_catalogue
         )
         ch_str_vcf = call_str.out.vcf
         ch_versions = ch_versions.mix(call_str.out.versions)

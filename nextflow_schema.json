@@ -35,11 +35,6 @@
                     "fa_icon": "fas fa-envelope",
                     "help_text": "Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits. If set in your user config file (`~/.nextflow/config`) then you don't need to specify this on the command line for every run.",
                     "pattern": "^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$"
-                },
-                "multiqc_title": {
-                    "type": "string",
-                    "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
-                    "fa_icon": "fas fa-file-signature"
                 }
             }
         },
@@ -55,7 +50,7 @@
                     "default": false,
                     "fa_icon": "fas fa-toggle-on"
                 },
-                
+
                 "winnowmap_kmers": {
                     "type": "string",
                     "description": "Path to repetitive k-mer file for Winnowmap",
@@ -156,7 +151,7 @@
                     "help_text": "This parameter is mandatory. Path to the reference genome FASTA file.",
                     "fa_icon": "far fa-file-code"
                 },
-                "bed_file": {
+                "target_bed": {
                     "type": "string",
                     "format": "file-path",
                     "description": "Path to BED file for coverage analysis (optional).",
@@ -191,17 +186,11 @@
                     "description": "Enable multi-caller SV filtering.",
                     "fa_icon": "fas fa-filter"
                 },
-                "use_survivor_bed": {
+                "merge_sv": {
                     "type": "boolean",
                     "default": true,
                     "description": "Use SURVIVOR for BED output.",
                     "fa_icon": "fas fa-bed"
-                },
-                "max_distance_breakpoints": {
-                    "type": "integer",
-                    "default": 1000,
-                    "description": "Maximum distance between breakpoints for merging.",
-                    "fa_icon": "fas fa-ruler"
                 },
                 "min_supporting_callers": {
                     "type": "integer",
@@ -209,78 +198,24 @@
                     "description": "Minimum number of supporting callers.",
                     "fa_icon": "fas fa-users"
                 },
-                "account_for_type": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Account for SV type in merging.",
-                    "fa_icon": "fas fa-cog"
-                },
-                "account_for_sv_strands": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Account for SV strands in merging.",
-                    "fa_icon": "fas fa-cog"
-                },
-                "estimate_distanced_by_sv_size": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Estimate distance by SV size.",
-                    "fa_icon": "fas fa-cog"
-                },
-                "min_sv_size": {
-                    "type": "integer",
-                    "default": 30,
-                    "description": "Minimum SV size to consider.",
-                    "fa_icon": "fas fa-ruler-horizontal"
-                },
-                "refdist": {
-                    "type": "integer",
-                    "default": 500,
-                    "description": "Reference distance for Truvari.",
-                    "fa_icon": "fas fa-ruler"
-                },
-                "pctsim": {
-                    "type": "number",
-                    "default": 0.7,
-                    "description": "Percent similarity for Truvari.",
-                    "fa_icon": "fas fa-percentage"
-                },
-                "pctseq": {
-                    "type": "number",
-                    "default": 0.7,
-                    "description": "Percent sequence similarity for Truvari.",
-                    "fa_icon": "fas fa-percentage"
-                },
-                "passonly": {
+                "filter_sv_pass": {
                     "type": "boolean",
                     "default": true,
                     "description": "Only consider PASS variants.",
                     "fa_icon": "fas fa-check"
                 },
-                "dup_to_ins": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Convert duplications to insertions.",
-                    "fa_icon": "fas fa-exchange-alt"
-                },
-                "primary_sv_caller": {
+                "sv_caller": {
                     "type": "string",
                     "default": "sniffles",
                     "enum": ["sniffles", "cutesv", "svim"],
                     "description": "Primary SV caller to use if no consensuSV.",
                     "fa_icon": "fas fa-tools"
                 },
-                "filter_sv": {
+                "downsample_sv": {
                     "type": "boolean",
                     "default": true,
                     "description": "Enable SV filtering by coverage.",
                     "fa_icon": "fas fa-filter"
-                },
-                "filter_pass_sv": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Filter PASS variants only in SV.",
-                    "fa_icon": "fas fa-check-circle"
                 },
                 "min_read_support": {
                     "type": "string",
@@ -419,7 +354,7 @@
                     "hidden": true
                 },
                 "spectre_test_fasta_file": {
-                    "type": "string", 
+                    "type": "string",
                     "format": "file-path",
                     "description": "Path to test FASTA file for Spectre CNV calling.",
                     "fa_icon": "fas fa-vial",
@@ -427,7 +362,7 @@
                 },
                 "spectre_test_clair3_vcf": {
                     "type": "string",
-                    "format": "file-path", 
+                    "format": "file-path",
                     "description": "Path to test Clair3 VCF for Spectre CNV calling.",
                     "fa_icon": "fas fa-vial",
                     "hidden": true
@@ -445,6 +380,12 @@
                     "format": "file-path",
                     "description": "Path to STR BED file.",
                     "fa_icon": "fas fa-bed"
+                },
+                "variant_catalogue": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to variant catalogue",
+                    "fa_icon": "fas fa-json"
                 }
             }
         },
