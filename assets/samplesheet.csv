@@ -1,2 +1,4 @@
 sample_id,ubam,fastq_dir,bam,methyl_bam,hpo_terms
-test,/home/nmahfel/nf-training/nanoraredx/assets/test_data/bam_pass,,,,HP:0002721;HP:0002110;HP:0500093;HP:0000717;HP:0001263;HP:0001763;HP:0003298;HP:0002857;HP:0001382
+D24.066371,/rds/projects/b/beggsa-clinicalnanopore/to_share_via_globus/LA195_HannahTitheradge_29-01-25/D24-066_Pool/20250129_1533_3H_PAY45689_fb1dc6e6/D24_066371/D24_066371.meth.umap.bam,,,,HP:0002754;HP:0002783;HP:0011919;HP:0001045;HP:0002716;HP:0003095;HP:0004313;HP:0001954;HP:0001733
+D24.066401,/rds/projects/b/beggsa-clinicalnanopore/to_share_via_globus/LA195_HannahTitheradge_29-01-25/D24-066_Pool/20250129_1533_3H_PAY45689_fb1dc6e6/D24_066401/D24_066401.meth.umap.bam,,,,
+D24.066411,/rds/projects/b/beggsa-clinicalnanopore/to_share_via_globus/LA195_HannahTitheradge_29-01-25/D24-066_Pool/20250129_1533_3H_PAY45689_fb1dc6e6/D24_066411/D24_066411.meth.umap.bam,,,,
