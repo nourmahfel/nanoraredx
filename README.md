@@ -28,24 +28,24 @@
 
 **longraredisease** is a comprehensive Nextflow pipeline for Oxford Nanopore sequencing analysis, designed for rare disease research and diagnostics. It delivers high-confidence variant discovery by integrating multiple state-of-the-art tools. longraredisease performs multi-caller structural variant (SV) detection, single nucleotide variant (SNV) calling, copy number variant (CNV) analysis, short tandem repeat (STR) detection, and phasing analysis in a reproducible, modular workflow.
 
-**Pipeline Overview**  
-- **Structural Variants (SVs):** Sniffles, CuteSV, SVIM, with SURVIVOR merging  
-- **Single Nucleotide Variants (SNVs):** Clair3, DeepVariant  
-- **Copy Number Variants (CNVs):** Spectre, QDNAseq  
-- **Short Tandem Repeats (STRs):** STRaglr  
-- **Phasing:** LongPhase  
-- **Quality Control:** Coverage analysis with mosdepth  
+**Pipeline Overview**
+- **Structural Variants (SVs):** Sniffles, CuteSV, SVIM, with Jasmine merging
+- **Single Nucleotide Variants (SNVs):** Clair3, DeepVariant
+- **Copy Number Variants (CNVs):** HifiCNV, Spectre
+- **Short Tandem Repeats (STRs):** STRaglr
+- **Phasing:** LongPhase
+- **Quality Control:** Coverage analysis with mosdepth
 
 ---
 
 ## Requirements
 
-**Software:**  
-- Nextflow (≥22.10.0)  
-- Docker or Singularity/Apptainer  
+**Software:**
+- Nextflow (≥22.10.0)
+- Docker or Singularity/Apptainer
 
-**Hardware:**  
-Will be updated later in the project 
+**Hardware:**
+Will be updated later in the project
 
 ---
 
@@ -62,7 +62,7 @@ nextflow run main.nf -profile test,docker
 ```
 **3. Run with Your Data**
 ```bash
-nextflow run main.nf     --bam_dir /path/to/bam/files      --outdir results     -profile docker
+nextflow run main.nf     --ubam /path/to/bam/files      --outdir results     -profile docker
 ```
 ---
 
@@ -70,11 +70,14 @@ nextflow run main.nf     --bam_dir /path/to/bam/files      --outdir results     
 
 | Parameter        | Description                   | Format         | Required |
 |------------------|------------------------------|----------------|----------|
-| --bam_dir        | Directory containing BAM files | Directory path | ✅       |
+| --ubam           | Directory containing BAM files | Directory path | ✅       |
+| --ubam           | Single unmapped bam            | File path      | ✅       |
+| --fastq_dir      | Directory containing fastqs    | Directory path | ✅       |
+| --aligned_bam    | Single aligneed bam            | File path      | ✅       |
 | --fasta_file     | Reference genome FASTA         | .fasta/.fa     | ✅       |
 | --outdir         | Output directory               | Directory path | ✅       |
 | --str_bed_file   | STR regions for analysis       | .bed           | ✅       |
-| --bed_file       | Target regions BED file        | .bed           | Optional |
+| --target_bed       | Target regions BED file        | .bed           | Optional |
 | --chrom_sizes    | Chromosome sizes file          | .txt           | Optional |
 
 
@@ -84,21 +87,28 @@ nextflow run main.nf     --bam_dir /path/to/bam/files      --outdir results     
 
 **Core Analysis Options**
 ```bash
---snv true/false              # SNV calling (default: true)
---cnv true/false              # CNV calling (default: true)
---str true/false              # STR analysis (default: true)
---phase true/false            # Phasing analysis (default: true)
---phase_with_sv true/false    # Include SVs in phasing (default: true)
+--align_with_bam  true/false      # Enable alignment
+--align_with_fastq   true/false   # Enable alignment with FASTQ files
+--generate_bam_stats true/false   # Enable generation of BAM statistics
+--generate_coverage true/false    # Run mosdepth
+--snv true/false                  # SNV calling (default: true)
+--cnv_spectre true/false          # CNV calling (default: true)
+--cnv_hificnv true/false          # CNV calling (default: true)
+--str true/false                  # STR analysis (default: true)
+--phase true/false                # Phasing analysis (default: true)
+--phase_with_sv true/false        # Include SVs in phasing (default: true)
+--qc true/false                   # Enable quality control
+--methyl true/false               # Enable methylation calling
+--annotate_sv  true/false         # Enable SV annotation with SvAnna
+
 ```
 **SV Calling Parameters**
 ```bash
---filter_sv_calls true/false           # Apply coverage-based filtering (default: true)
+--filter_sv_pass  true/false           # Apply coverage-based filtering (default: true)
+--downsample_sv   true/false           # Downsample by coverage
 --min_read_support auto/integer        # Minimum read support (default: auto)
 --min_read_support_limit integer       # Minimum support limit (default: 3)
---merge_sv_calls true/false            # Merge calls from multiple callers (default: true)
---max_distance_breakpoints integer     # Max distance for merging (default: 1000)
---min_supporting_callers integer       # Min callers supporting variant (default: 2)
---min_sv_size integer                  # Minimum SV size (default: 30)
+--merge_sv       true/false            # Merge calls from multiple callers (default: true)
 ```
 **SNV Calling Parameters**
 ```bash
@@ -108,10 +118,6 @@ nextflow run main.nf     --bam_dir /path/to/bam/files      --outdir results     
 ```
 **CNV Calling Parameters**
 ```bash
---use_qdnaseq true/false               # Use QDNAseq instead of Spectre (default: false)
---genome_build hg38/hg19               # Genome build (default: hg38)
---qdnaseq_bin_size integer             # Bin size in kb (default: 1000)
---cutoff float                         # CNV calling cutoff (default: 0.5)
 --spectre_fasta_file path              # Full genome FASTA for Spectre
 --spectre_mosdepth path                # Mosdepth regions file
 --spectre_snv_vcf path                 # SNV VCF for Spectre
@@ -122,53 +128,64 @@ nextflow run main.nf     --bam_dir /path/to/bam/files      --outdir results     
 
 **Basic Run**
 ```bash
-nextflow run main.nf     --bam_dir /data/bam_files     --fasta_file /ref/genome.fasta     --outdir results     -profile docker
+nextflow run main.nf     --ubam /data/bam_files     --fasta_file /ref/genome.fasta     --outdir results     -profile docker
 ```
 **SV-Only Analysis**
 ```bash
-nextflow run main.nf     --bam_dir /data/bam_files     --fasta_file /ref/genome.fasta     --snv false     --cnv false     --str false     --phase false     --outdir sv_results     -profile docker
+nextflow run main.nf     --ubam /data/bam_files     --fasta_file /ref/genome.fasta     --snv false     --cnv_hificnv false     --str false     --phase false     --outdir sv_results     -profile docker
 ```
 **Targeted Analysis with BED File**
 ```bash
-nextflow run main.nf     --bam_dir /data/bam_files     --fasta_file /ref/genome.fasta     --bed_file /targets/exome.bed     --use_qdnaseq true     --outdir targeted_results     -profile docker
+nextflow run main.nf     --ubam /data/bam_files     --fasta_file /ref/genome.fasta     --target_bed /targets/exome.bed       --outdir targeted_results     -profile docker
 ```
 **High-Sensitivity SV Calling**
 ```bash
-nextflow run main.nf     --bam_dir /data/bam_files     --fasta_file /ref/genome.fasta     --min_supporting_callers 1     --min_sv_size 20     --filter_sv_calls false     --outdir sensitive_sv     -profile docker
+nextflow run main.nf     --ubam /data/bam_files     --fasta_file /ref/genome.fasta     --min_supporting_callers 1     --min_sv_size 20     --filter_sv_calls false     --outdir sensitive_sv     -profile docker
 ```
 **Custom Resource Limits**
 ```bash
-nextflow run main.nf     --bam_dir /data/bam_files     --fasta_file /ref/genome.fasta     --outdir results     -profile docker     --max_cpus 32     --max_memory 128.GB
+nextflow run main.nf     --ubam /data/bam_files     --fasta_file /ref/genome.fasta     --outdir results     -profile docker     --max_cpus 32     --max_memory 128.GB
 ```
 ---
 
 ## Output Structure
 
 ```
-results/
-├── minimap2/           # Aligned BAM files
-├── mosdepth/           # Coverage analysis
-├── sniffles/           # Sniffles SV calls
-├── cutesv/             # CuteSV SV calls  
-├── svim/               # SVIM SV calls
-├── survivor/           # Merged SV calls
-├── clair3/             # Clair3 SNV calls
-├── deepvariant/        # DeepVariant SNV calls (if enabled)
-├── snv_combined/       # Combined SNV calls
-├── longphase/          # Phasing results (if enabled)
-├── spectre/            # Spectre CNV calls (if enabled)
-├── runqdnaseq/         # QDNAseq CNV calls (if enabled)
-├── straglr/            # STR analysis (if enabled)
-└── pipeline_info/      # Execution reports
+.
+├── pipeline_info
+│   ├── execution_trace_2025-10-31_15-04-22.txt
+├── ref
+└── test
+    ├── bam_stats
+    ├── clair3
+    ├── cutesv
+    ├── deepvariant
+    ├── fastq_files
+    ├── filtered_pass_sv
+    ├── hificnv
+    ├── longphase
+    ├── mapped_bam
+    ├── merged_SNV
+    ├── merged_sv
+    ├── methyl
+    ├── methyl_bedgraph
+    ├── mosdepth
+    ├── nanoplot_qc
+    ├── sniffles
+    ├── straglr
+    ├── svanna
+    ├── svim
+    ├── unmapped_bam
+    └── unzippedSV_vcfs
 ```
 ---
 
 ## Configuration Profiles
 
-**Available Profiles:**  
-- test: Minimal test dataset  
-- docker: Use Docker containers  
-- singularity: Use Singularity containers  
+**Available Profiles:**
+- test: Minimal test dataset
+- docker: Use Docker containers
+- singularity: Use Singularity containers
 
 
 **Custom Configuration**
@@ -227,7 +244,7 @@ The pipeline includes test data for validation:
   Check file paths and permissions (ls -la /path/to/input/files)
 - Container Issues:
   Try different container engine (-profile singularity)
-- SURVIVOR Filename Collisions:
+- JASMINE Filename Collisions:
   Ensure BAM files have unique prefixes
   Check that filter_sv_calls is properly configured
 
@@ -260,4 +277,4 @@ This project is licensed under the MIT License – see the LICENSE file for deta
 ---
 
 This pipeline integrates several tools for variant calling:
-Sniffles, CuteSV, SVIM, SURVIVOR, Clair3, DeepVariant, LongPhase, Spectre, STRaglr
+Sniffles, CuteSV, SVIM, JASMINESV, Clair3, DeepVariant, LongPhase, Spectre, STRaglr

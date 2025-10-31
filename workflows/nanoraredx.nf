@@ -182,7 +182,7 @@ workflow nanoraredx {
         ================================================================================
         */
 
-        // Collect unaligned BAM files
+
         // Collect unaligned BAM files
         ch_bam_files = ch_samplesheet
             .map { meta, data ->
@@ -231,13 +231,13 @@ workflow nanoraredx {
         // Set final aligned BAM channels from minimap2 output
         ch_final_sorted_bam = alignment_subworkflow.out.bam
         .map { meta, bam ->
-        def clean_meta = [id: meta.id]  // Keep only the id field
+        def clean_meta = [id: meta.id]
         [clean_meta, bam]
         }
 
         ch_final_sorted_bai = alignment_subworkflow.out.bai
         .map { meta, bai ->
-        def clean_meta = [id: meta.id]  // Keep only the id field
+        def clean_meta = [id: meta.id]
         [clean_meta, bai]
         }
 
