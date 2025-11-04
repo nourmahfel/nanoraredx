@@ -1,0 +1,72 @@
+nextflow_workflow {
+
+    name "Test Subworkflow CALL_HIFICNV"
+    script "../subworkflows/local/call_hificnv.nf"
+    workflow "call_hificnv"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "call_hificnv"
+    tag "hificnv"
+
+    test("CNV calling with HiFiCNV") {
+
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true)
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = file('${projectDir}/assets/test_data/test.exclude.bed', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.vcf != null },
+                { assert workflow.out.versions != null }
+            )
+        }
+    }
+
+    test("CNV calling with HiFiCNV - stub") {
+
+        options "-stub"
+
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true)
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = file('${projectDir}/assets/test_data/test.exclude.bed', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.vcf != null }
+            )
+        }
+    }
+}

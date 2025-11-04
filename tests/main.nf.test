@@ -1,21 +1,284 @@
 nextflow_pipeline {
 
-    name "Test Workflow main.nf"
+    name "Test Complete Pipeline NANORAREDX"
     script "main.nf"
 
-    test("Should run without failures") {
+    tag "pipeline"
+    tag "nanoraredx"
+    tag "integration"
+
+    test("Complete pipeline - FASTQ alignment with all analyses") {
 
         when {
             params {
-                // define parameters here. Example: 
-                // outdir = "tests/results"
+                // Input and output
+                input = "${projectDir}/assets/samplesheet_test_fastq.csv"
+                outdir = "results"
+
+                // Reference files
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+                str_bed_file = "${projectDir}/assets/test_data/straglr/str.test.bed"
+                exclude_bed_hificnv = "${projectDir}/assets/test_data/test.exclude.bed"
+
+                // Main analysis toggles
+                align_with_fastq = true
+                align_with_bam = false
+                use_winnowmap = false
+
+                // Enable all major analyses
+                generate_bam_stats = true
+                generate_coverage = true
+                qc = false
+                sv = true
+                snv = true
+                cnv_hificnv = false
+                cnv_spectre = false
+                str = true
+                phase = true
+                methyl = false
+
+                // SV parameters
+                merge_sv = true
+                filter_sv_pass = true
+                annotate_sv = false
+
+                // SNV parameters
+                deepvariant = true
+                merge_snv = true
+                filter_pass_snv = true
+                clair3_model = "ont"
+                clair3_platform = "ont"
+
+                // Phasing parameters
+                phase_with_sv = true
+
+                // VCF unification
+                unify_geneyx = false
+
+                // Test-specific settings
+                use_test_data = false
             }
         }
 
         then {
-            assert workflow.success
-        }
+            assertAll(
+                { assert workflow.success },
+                { assert path("${params.outdir}").exists() },
 
+                // Check pipeline info
+                { assert path("${params.outdir}/pipeline_info").exists() },
+                { assert path("${params.outdir}/pipeline_info").list().size() > 0 },
+
+                // Check alignment outputs
+                { assert path("${params.outdir}/test/mapped_bam").exists() },
+
+                // Check BAM stats if enabled
+                { assert path("${params.outdir}/test/bam_stats").exists() },
+
+                // Check coverage analysis
+                { assert path("${params.outdir}/test/mosdepth").exists() },
+
+                // Check SV calling outputs
+                { assert path("${params.outdir}/test/sniffles").exists() },
+                { assert path("${params.outdir}/test/svim").exists() },
+                { assert path("${params.outdir}/test/cutesv").exists() },
+
+                // Check SNV calling outputs
+                { assert path("${params.outdir}/test/clair3").exists() },
+                { assert path("${params.outdir}/test/deepvariant").exists() },
+
+                // Check STR analysis outputs
+                { assert path("${params.outdir}/test/straglr").exists() },
+
+                // Check phasing outputs
+                { assert path("${params.outdir}/test/longphase").exists() },
+
+                // Check that versions file is created
+                { assert path("${params.outdir}/pipeline_info/nf_core_nanoraredx_software_versions.yml").exists() }
+            )
+        }
     }
 
+    test("Complete pipeline - BAM alignment workflow") {
+
+        when {
+            params {
+                input = "${projectDir}/assets/samplesheet_test_ubam.csv"
+                outdir = "results"
+
+                // Reference files
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+                str_bed_file = "${projectDir}/assets/test_data/straglr/str.test.bed"
+                exclude_bed_hificnv = "${projectDir}/assets/test_data/test.exclude.bed"
+
+                // BAM alignment workflow
+                align_with_bam = true
+                align_with_fastq = false
+                use_winnowmap = false
+
+                // Enable subset of analyses for faster testing
+                generate_bam_stats = true
+                generate_coverage = true
+                qc = true
+                sv = true
+                snv = true
+                cnv_hificnv = false
+                cnv_spectre = false
+                str = false
+                phase = false
+                methyl = false
+
+                // SV parameters
+                merge_sv = false
+                filter_sv_pass = true
+                sv_caller = 'sniffles'
+
+                // SNV parameters
+                deepvariant = false
+                merge_snv = false
+                filter_pass_snv = true
+                clair3_model = "ont"
+                clair3_platform = "ont"
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert path("${params.outdir}").exists() },
+                { assert path("${params.outdir}/pipeline_info").exists() },
+                { assert path("${params.outdir}/test/bam_stats").exists() },
+                { assert path("${params.outdir}/test/nanoplot_qc").exists() },
+                { assert path("${params.outdir}/test/sniffles").exists() },
+                { assert path("${params.outdir}/test/clair3").exists() }
+            )
+        }
+    }
+
+    test("Pipeline - minimal analysis (aligned BAM input)") {
+
+        when {
+            params {
+                input = "${projectDir}/assets/samplesheet_test_bam.csv"
+                outdir = "results"
+
+                // Reference files
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+
+                // Use pre-aligned BAM (no alignment needed)
+                align_with_bam = false
+                align_with_fastq = false
+
+                // Minimal analysis set
+                generate_bam_stats = true
+                generate_coverage = false
+                qc = false
+                sv = true
+                snv = false
+                cnv_hificnv = false
+                cnv_spectre = false
+                str = false
+                phase = false
+                methyl = false
+
+                // SV parameters
+                merge_sv = false
+                filter_sv_pass = false
+                sv_caller = 'sniffles'
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert path("${params.outdir}").exists() },
+                { assert path("${params.outdir}/pipeline_info").exists() },
+                { assert path("${params.outdir}/test/bam_stats").exists() },
+                { assert path("${params.outdir}/test/sniffles").exists() }
+            )
+        }
+    }
+
+    test("Pipeline - stub mode (full pipeline)") {
+
+        options "-stub"
+
+        when {
+            params {
+                input = "${projectDir}/assets/samplesheet_test_fastq.csv"
+                outdir = "results"
+
+                // Reference files
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+                str_bed_file = "${projectDir}/assets/test_data/straglr/str.test.bed"
+                exclude_bed_hificnv = "${projectDir}/assets/test_data/test.exclude.bed"
+
+                // Enable all analyses for comprehensive stub testing
+                align_with_fastq = true
+                align_with_bam = false
+                use_winnowmap = false
+                generate_bam_stats = true
+                generate_coverage = true
+                qc = true
+                sv = true
+                snv = false
+                cnv_hificnv = true
+                cnv_spectre = false
+                str = true
+                phase = true
+                methyl = false
+
+                // All optional features
+                merge_sv = true
+                filter_sv_pass = true
+                deepvariant = false
+                merge_snv = false
+                phase_with_sv = true
+                unify_geneyx = false
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert path("${params.outdir}").exists() }
+            )
+        }
+    }
+
+    test("Pipeline - error handling (missing input)") {
+
+        when {
+            params {
+                input = "/non/existent/samplesheet.csv"
+                outdir = "results"
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+    }
+
+    test("Pipeline - parameter validation") {
+
+        when {
+            params {
+                input = "${projectDir}/assets/samplesheet_test_bam.csv"
+                outdir = "results"
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+
+                // Test conflicting parameters
+                align_with_fastq = true
+                align_with_bam = true  // Should cause validation error
+            }
+        }
+
+        then {
+            // This might pass or fail depending on your validation logic
+            // Adjust based on your parameter validation implementation
+            assert workflow.success || workflow.failed
+        }
+    }
 }

@@ -1,0 +1,74 @@
+nextflow_workflow {
+
+    name "Test Subworkflow CALL_STR"
+    script "../subworkflows/local/call_str.nf"
+    workflow "call_str"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "call_str"
+    tag "straglr"
+
+    test("STR analysis with Straglr") {
+
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true)
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = file('${projectDir}/assets/test_data/straglr/str.test.bed', checkIfExists: true)
+                input[3] = file('${projectDir}/assets/data/variant_catalog_hg38.json', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.vcf != null },
+                { assert workflow.out.versions != null }
+            )
+        }
+    }
+
+    test("STR analysis - stub") {
+
+        options "-stub"
+
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true)
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = file('${projectDir}/assets/test_data/straglr/str.test.bed', checkIfExists: true)
+                input[3] = file('${projectDir}/assets/data/variant_catalog_hg38.json', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.vcf != null }
+            )
+        }
+    }
+}

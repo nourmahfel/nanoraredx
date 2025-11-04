@@ -34,7 +34,7 @@ process RE2SUPPORT {
     stub:
     prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch "${prefix}_RE2SUPPORT.vcf"
+    touch "${prefix}_normalized.vcf"
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

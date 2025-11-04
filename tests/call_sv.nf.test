@@ -1,0 +1,98 @@
+nextflow_workflow {
+
+    name "Test Subworkflow CALL_SV"
+    script "../subworkflows/local/call_sv.nf"
+    workflow "call_sv"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "call_sv"
+    tag "sniffles"
+    tag "svim"
+    tag "cutesv"
+
+    test("SV calling with ONT data") {
+
+        when {
+            params {
+                vcf_output = true
+                snf_output = false
+            }
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true)
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = Channel.of([
+                    [ id:'trf' ],
+                    file('${projectDir}/assets/data/sniffles_no_alt_analysis_set.trf.bed', checkIfExists: true)
+                ])
+
+                input[3] = params.vcf_output
+                input[4] = params.snf_output
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.sniffles_vcf != null },
+                { assert workflow.out.svim_vcf != null },
+                { assert workflow.out.cutesv_vcf != null },
+                { assert workflow.out.versions != null }
+            )
+        }
+    }
+
+    test("SV calling - stub") {
+
+        options "-stub"
+
+        when {
+            params {
+                vcf_output = true
+                snf_output = false
+            }
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true)
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = Channel.of([
+                    [ id:'trf' ],
+                    file('${projectDir}/assets/data/sniffles_no_alt_analysis_set.trf.bed', checkIfExists: true)
+                ])
+
+                input[3] = params.vcf_output
+                input[4] = params.snf_output
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.sniffles_vcf != null },
+                { assert workflow.out.svim_vcf != null },
+                { assert workflow.out.cutesv_vcf != null }
+            )
+        }
+    }
+}

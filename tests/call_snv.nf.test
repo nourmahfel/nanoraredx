@@ -1,0 +1,59 @@
+nextflow_workflow {
+
+    name "Test Subworkflow CALL_SNV"
+    script "../subworkflows/local/call_snv.nf"
+    workflow "call_snv"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "call_snv"
+    tag "clair3"
+    tag "deepvariant"
+
+    test("SNV calling with Clair3") {
+
+        when {
+            params {
+                clair3_model = "ont"
+                clair3_platform = "ont"
+                filter_pass_snv = true
+            }
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true),
+                    params.clair3_model,
+                    [],
+                    params.clair3_platform
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta.fai', checkIfExists: true)
+                ])
+
+                input[3] = false  // deepvariant
+                input[4] = Channel.empty()  // bed file
+                input[5] = params.filter_pass_snv
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.clair3_vcf != null },
+                { assert workflow.out.clair3_tbi != null },
+                { assert workflow.out.versions != null }
+            )
+        }
+    }
+
+}

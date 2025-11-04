@@ -7,3 +7,5 @@ testing/
 testing*
 *.pyc
 null/
+assets/test_data/*.bam
+assets/test_data/*.bam.bai

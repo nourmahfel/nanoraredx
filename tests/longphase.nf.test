@@ -1,0 +1,52 @@
+nextflow_workflow {
+
+    name "Test Subworkflow LONGPHASE"
+    script "../subworkflows/local/longphase.nf"
+    workflow "longphase"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "longphase"
+    tag "phasing"
+
+    test("Phasing - stub only") {
+
+        options "-stub"
+
+        when {
+            workflow {
+                """
+                // Create dummy files for stub testing
+                def dummy_vcf = file('dummy_snps.vcf.gz')
+                dummy_vcf.text = ""
+
+                input[0] = Channel.of([
+                    [ id:'test' ],
+                    file('${projectDir}/assets/test_data/test.bam', checkIfExists: true),
+                    file('${projectDir}/assets/test_data/test.bam.bai', checkIfExists: true),
+                    dummy_vcf,
+                    [],
+                    []
+                ])
+
+                input[1] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta', checkIfExists: true)
+                ])
+
+                input[2] = Channel.of([
+                    [ id:'genome_22' ],
+                    file('${projectDir}/assets/test_data/genome_22/genome_22.fasta.fai', checkIfExists: true)
+                ])
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.vcf != null }
+            )
+        }
+    }
+}

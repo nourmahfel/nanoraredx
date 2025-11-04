@@ -1,0 +1,171 @@
+nextflow_workflow {
+
+    name "Test Subworkflow ALIGNMENT_SUBWORKFLOW"
+    script "../subworkflows/local/align.nf"
+    workflow "alignment_subworkflow"
+
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "alignment_subworkflow"
+    tag "minimap2"
+    tag "minimap2/index"
+    tag "minimap2/align"
+    tag "winnowmap"
+
+    test("HG002 ONT - fastq - minimap2 alignment") {
+
+        when {
+            params {
+                use_winnowmap = false
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+            }
+            workflow {
+                """
+                // Reference genome from params
+                input[0] = [
+                    [ id:'genome_22' ],
+                    file(params.fasta_file, checkIfExists: true)
+                ]
+
+                // ONT FASTQ reads from your test data
+                input[1] = [
+                    [ id:'test', single_end:true ],
+                    file('${projectDir}/assets/test_data/HG002_ONT.fastq.gz', checkIfExists: true)
+                ]
+
+                // Empty k-mers channel for minimap2
+                input[2] = [[],[]]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.trace.succeeded().size() == 2 }, // MINIMAP2_INDEX + MINIMAP2_ALIGN
+                { assert workflow.out.bam != null },
+                { assert workflow.out.bai != null },
+                { assert workflow.out.versions != null },
+                // Check that BAM file is created with correct sample ID
+                { assert workflow.out.bam.collect { meta, bam -> meta.id }.contains('test') },
+                { assert workflow.out.bai.collect { meta, bai -> meta.id }.contains('test') },
+                { assert snapshot(
+                    workflow.out.bam.collect { meta, bam -> [meta.id, bam.name] },
+                    workflow.out.bai.collect { meta, bai -> [meta.id, bai.name] },
+                    workflow.out.versions
+                ).match() }
+            )
+        }
+    }
+
+    test("HG002 ONT - fastq - winnowmap alignment") {
+
+        when {
+            params {
+                use_winnowmap = true
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+            }
+            workflow {
+                """
+                // Reference genome from params
+                input[0] = [
+                    [ id:'genome_22' ],
+                    file(params.fasta_file, checkIfExists: true)
+                ]
+
+                // ONT FASTQ reads
+                input[1] = [
+                    [ id:'test', single_end:true ],
+                    file('${projectDir}/assets/test_data/HG002_ONT.fastq.gz', checkIfExists: true)
+                ]
+
+                // Empty k-mers channel (or provide winnowmap k-mers if available)
+                input[2] = [[],[]]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.trace.succeeded().size() == 1 }, // Only WINNOWMAP_ALIGN
+                { assert workflow.out.bam != null },
+                { assert workflow.out.bai != null },
+                { assert workflow.out.versions != null },
+                { assert workflow.out.bam.collect { meta, bam -> meta.id }.contains('test') },
+                { assert workflow.out.bai.collect { meta, bai -> meta.id }.contains('test') },
+                { assert snapshot(
+                    workflow.out.bam.collect { meta, bam -> [meta.id, bam.name] },
+                    workflow.out.bai.collect { meta, bai -> [meta.id, bai.name] },
+                    workflow.out.versions
+                ).match() }
+            )
+        }
+    }
+
+    test("HG002 ONT - fastq - minimap2 alignment - stub") {
+
+        options "-stub"
+
+        when {
+            params {
+                use_winnowmap = false
+                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
+            }
+            workflow {
+                """
+                input[0] = [
+                    [ id:'genome_22' ],
+                    file(params.fasta_file, checkIfExists: true)
+                ]
+
+                input[1] = [
+                    [ id:'test', single_end:true ],
+                    file('${projectDir}/assets/test_data/HG002_ONT.fastq.gz', checkIfExists: true)
+                ]
+
+                input[2] = [[],[]]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.bam != null },
+                { assert workflow.out.bai != null },
+                { assert workflow.out.versions != null },
+                { assert snapshot(workflow.out).match() }
+            )
+        }
+    }
+
+    test("HG002 ONT - fastq - error handling - missing reference") {
+
+        when {
+            params {
+                use_winnowmap = false
+                fasta_file = "/non/existent/path/genome.fasta"
+            }
+            workflow {
+                """
+                input[0] = [
+                    [ id:'genome_22' ],
+                    file(params.fasta_file, checkIfExists: false)
+                ]
+
+                input[1] = [
+                    [ id:'test', single_end:true ],
+                    file('${projectDir}/assets/test_data/HG002_ONT.fastq.gz', checkIfExists: true)
+                ]
+
+                input[2] = [[],[]]
+                """
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+    }
+}
