@@ -84,7 +84,7 @@ workflow nanoraredx {
                 def meta = [id: sample_id]
                 def data = [
                     ubam: row[1] ?: null,
-                    fastq_dir: row[2] ?: null,
+                    fastq: row[2] ?: null,
                     bam: row[3] ?: null,
                     methyl_bam: row[4] ?: null,
                     hpo_terms: row[5] ?: null
@@ -143,25 +143,50 @@ workflow nanoraredx {
         // Collect FASTQ files
         ch_samplesheet.view()
         ch_fastq_files = ch_samplesheet
-            .map { meta, data ->
-                def fastq_dir = file(data.fastq_dir)
-                def fastq_files = fastq_dir.listFiles().findAll {
+        .map { meta, data ->
+            def fastq = file(data.fastq)
+
+            if (fastq.isFile() && (fastq.name.endsWith('.fastq.gz') || fastq.name.endsWith('.fq.gz'))) {
+                // Single FASTQ file case
+                return [meta, [fastq]]
+            } else if (fastq.isDirectory()) {
+                // Directory with multiple FASTQ files
+                def fastq_files = fastq.listFiles().findAll {
                     it.name.endsWith('.fastq.gz') || it.name.endsWith('.fq.gz')
                 }
+
+                if (fastq_files.isEmpty()) {
+                    error "No FASTQ files found in directory: ${data.fastq} for sample ${meta.id}"
+                }
+
                 return [meta, fastq_files]
+            } else {
+                error "Invalid FASTQ input for sample ${meta.id}: ${data.fastq}"
             }
+        }
+
+        ch_fastq_files.branch { meta, files ->
+        single: files.size() == 1
+            return [meta, files[0]]  // Extract single file from list
+            multiple: files.size() > 1
+            return [meta + [single_end: true], files]  // Keep as list for CAT_FASTQ
+            }.set { fastq_branched }
+
 
         // Prepare input for nanoplot from FASTQ
         CAT_FASTQ(
-            ch_fastq_files.map { meta, fastq_list ->
+            fastq_branched.multiple.map { meta, fastq_list ->
                 [meta + [single_end: true], fastq_list]
             }
         )
 
+        ch_processed_fastq = fastq_branched.single
+        .mix(CAT_FASTQ.out.reads)
+
         // Align FASTQ reads to reference genome using minimap2
         alignment_subworkflow(
             ch_fasta,
-            CAT_FASTQ.out.reads,
+            ch_processed_fastq,
             params.winnowmap_kmers
         )
 
@@ -171,7 +196,7 @@ workflow nanoraredx {
         ch_final_sorted_bam = alignment_subworkflow.out.bam
         ch_final_sorted_bai = alignment_subworkflow.out.bai
 
-        ch_nanoplot = CAT_FASTQ.out.reads
+        ch_nanoplot = ch_processed_fastq
         ch_versions = ch_versions.mix(CAT_FASTQ.out.versions)
     }
 

@@ -36,12 +36,26 @@
                 "description": "Directory containing unaligned BAM files OR single BAM file for this sample",
                 "help_text": "Either a directory path containing unaligned BAM files OR a single .bam file path. Used when --align_with_bam is enabled."
             },
-            "fastq_dir": {
+            "fastq": {
                 "anyOf": [
-                    { "type": "string", "format": "directory-path" },
-                    { "type": "string", "maxLength": 0 }
+                    {
+                        "type": "string",
+                        "format": "directory-path",
+                        "description": "Directory containing unaligned BAM files"
+                    },
+                    {
+                        "type": "string",
+                        "format": "file-path",
+                        "pattern": "^\\S+\\.fastq.gz$",
+                        "description": "Single unaligned BAM file"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0,
+                        "description": "Empty string when not used"
+                    }
                 ],
-                "description": "Directory containing FASTQ files for this sample",
+                "description": "Directory containing FASTQ files for this sample or a single FASTQ file",
                 "help_text": "Directory path containing FASTQ files (.fastq.gz or .fq.gz). Used when --align_with_fastq is enabled."
             },
             "bam": {
@@ -72,7 +86,7 @@
         "required": ["sample_id"],
         "anyOf": [
             { "required": ["ubam"], "not": { "properties": { "ubam": { "maxLength": 0 } } } },
-            { "required": ["fastq_dir"], "not": { "properties": { "fastq_dir": { "maxLength": 0 } } } },
+            { "required": ["fastq"], "not": { "properties": { "fastq": { "maxLength": 0 } } } },
             { "required": ["bam"], "not": { "properties": { "bam": { "maxLength": 0 } } } }
         ],
         "additionalProperties": false
