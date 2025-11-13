@@ -63,6 +63,9 @@ process NORMALIZE_JASMINE {
 ##INFO=<ID=SUPP_EXT,Number=1,Type=Integer,Description="Support external">
 ##INFO=<ID=INTRASAMPLE_IDLIST,Number=.,Type=String,Description="Intrasample ID list">
 ##INFO=<ID=CHR2,Number=1,Type=String,Description="Chromosome for second breakpoint">
+##INFO=<ID=STD_SPAN,Number=1,Type=Float,Description="Standard deviation in span of merged SV signatures">
+##INFO=<ID=STD_POS,Number=1,Type=Float,Description="Standard deviation in position of merged SV signatures">
+##INFO=<ID=SEQS,Number=.,Type=String,Description="Insertion sequences from all supporting reads">
 HDR
 
     # Step 3: Add headers before #CHROM line

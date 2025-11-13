@@ -27,7 +27,7 @@ process SPECTRE {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    
+
     """
     spectre CNVCaller \
         --coverage ${mosdepth_cov} \
