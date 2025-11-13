@@ -70,7 +70,7 @@ workflow call_snv {
 
         if (filter_pass_snv) {
             ch_deepvariant_vcf = DEEPVARIANT_RUNDEEPVARIANT.out.vcf
-                .join(DEEPVARIANT_RUNDEEPVARIANT.out.vcf_tbi, by: 0)
+                .join(DEEPVARIANT_RUNDEEPVARIANT.out.vcf_index, by: 0)
 
             BCFTOOLS_FILTER_DEEPVARIANT(
                 ch_deepvariant_vcf,
@@ -97,10 +97,6 @@ workflow call_snv {
     emit:
     clair3_vcf           = ch_final_clair3_vcf      // Filtered or unfiltered based on filter_pass
     clair3_tbi           = ch_final_clair3_tbi      // Corresponding index
-    clair3_full_vcf      = CLAIR3.out.full_vcf      // Original full VCF
-    clair3_full_tbi      = CLAIR3.out.full_tbi      // Original full TBI
-    clair3_pileup_vcf    = CLAIR3.out.pileup_vcf    // Pileup VCF
-    clair3_pileup_tbi    = CLAIR3.out.pileup_tbi    // Pileup TBI
     deepvariant_vcf      = ch_final_deepvariant_vcf // Filtered or unfiltered DeepVariant VCF
     deepvariant_tbi      = ch_final_deepvariant_tbi // Corresponding index
     versions = ch_versions

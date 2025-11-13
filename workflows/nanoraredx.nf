@@ -110,7 +110,7 @@ workflow nanoraredx {
         .first()
 
     // Generate FAI index
-    SAMTOOLS_FAIDX(ch_fasta, true)
+    SAMTOOLS_FAIDX(ch_fasta, [[:], []], true)
     ch_fai = SAMTOOLS_FAIDX.out.fai
     ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
 
@@ -793,31 +793,24 @@ if (params.sv) {
 ================================================================================
 */
 
-    if (params.unify_geneyx) {
+if (params.unify_geneyx) {
+    ch_sv_unify = ch_sv_vcf_final.map { meta, path ->
+    [[id:meta.id], path]  // Extract just the ID string and keep the path
+    }
 
-        ch_combined = ch_sv_vcf_final
+    ch_combined = ch_sv_unify
         .join(ch_cnv_vcf, by: 0, remainder: true)
         .join(ch_str_vcf, by: 0, remainder: true)
 
-
-        unify_vcf_subworkflow(
-        ch_combined.map { meta, sv, cnv, str -> [meta, sv] },
-        ch_combined.map { meta, sv, cnv, str -> [meta, cnv ?: []] },
-        ch_combined.map { meta, sv, cnv, str -> [meta, str ?: []] },
-        params.modify_str_calls ?: false
-
+    unify_vcf_subworkflow(
+        ch_combined.map { meta, sv, cnv, str -> [meta, sv ?: []] },           // ch_sv_vcfs
+        ch_combined.map { meta, sv, cnv, str -> [meta, cnv ?: []] },    // ch_cnv_vcf
+        ch_combined.map { meta, sv, cnv, str -> [meta, str ?: []] },    // ch_repeat_vcf
+        params.modify_str_calls ?: false                                // modify_repeats
     )
+
     ch_versions = ch_versions.mix(unify_vcf_subworkflow.out.versions)
-
-
-    //  unify_vcf_subworkflow(
-        //     params.sv ? ch_sv_vcf : Channel.value([[:], []]),
-        //     params.cnv ? ch_cnv_vcf : Channel.value([[:], []]),
-        //     params.str ? ch_str_vcf : Channel.value([[:], []]),
-        //     params.modify_str_calls ?: false
-        // )
-
-    }
+}
     softwareVersionsToYAML(ch_versions)
     .collectFile(
         storeDir: "${params.outdir}/pipeline_info",

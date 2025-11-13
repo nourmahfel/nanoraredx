@@ -83,12 +83,6 @@
                     "description": "Enable single nucleotide variant calling.",
                     "fa_icon": "fas fa-search"
                 },
-                "cnv": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable copy number variant calling.",
-                    "fa_icon": "fas fa-chart-line"
-                },
                 "str": {
                     "type": "boolean",
                     "default": true,
@@ -173,23 +167,11 @@
             "fa_icon": "fas fa-dna",
             "description": "Options for structural variant calling and filtering.",
             "properties": {
-                "consensuSV": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable multi-caller SV filtering.",
-                    "fa_icon": "fas fa-filter"
-                },
                 "merge_sv": {
                     "type": "boolean",
                     "default": true,
                     "description": "Use SURVIVOR for BED output.",
                     "fa_icon": "fas fa-bed"
-                },
-                "min_supporting_callers": {
-                    "type": "integer",
-                    "default": 2,
-                    "description": "Minimum number of supporting callers.",
-                    "fa_icon": "fas fa-users"
                 },
                 "filter_sv_pass": {
                     "type": "boolean",
@@ -206,7 +188,7 @@
                 },
                 "downsample_sv": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "Enable SV filtering by coverage.",
                     "fa_icon": "fas fa-filter"
                 },
@@ -253,7 +235,7 @@
             "properties": {
                 "deepvariant": {
                     "type": "boolean",
-                    "default": false,
+                    "default": true,
                     "description": "Enable DeepVariant calling.",
                     "fa_icon": "fas fa-brain"
                 },
@@ -265,7 +247,7 @@
                 },
                 "filter_pass_snv": {
                     "type": "boolean",
-                    "default": false,
+                    "default": true,
                     "description": "Filter PASS variants only in SNV.",
                     "fa_icon": "fas fa-check-circle"
                 },
@@ -506,14 +488,6 @@
                     "fa_icon": "fas fa-remove-format",
                     "hidden": true
                 },
-                "max_multiqc_email_size": {
-                    "type": "string",
-                    "description": "File size limit when attaching MultiQC reports to summary emails.",
-                    "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
-                    "default": "25.MB",
-                    "fa_icon": "fas fa-file-upload",
-                    "hidden": true
-                },
                 "monochrome_logs": {
                     "type": "boolean",
                     "description": "Do not use coloured log outputs.",
@@ -526,24 +500,6 @@
                     "fa_icon": "fas fa-people-group",
                     "help_text": "Incoming hook URL for messaging service. Currently, MS Teams and Slack are supported.",
                     "hidden": true
-                },
-                "multiqc_config": {
-                    "type": "string",
-                    "format": "file-path",
-                    "description": "Custom config file to supply to MultiQC.",
-                    "fa_icon": "fas fa-cog",
-                    "hidden": true
-                },
-                "multiqc_logo": {
-                    "type": "string",
-                    "description": "Custom logo file to supply to MultiQC. File name must also be set in the MultiQC config file",
-                    "fa_icon": "fas fa-image",
-                    "hidden": true
-                },
-                "multiqc_methods_description": {
-                    "type": "string",
-                    "description": "Custom MultiQC yaml file containing HTML including a methods description.",
-                    "fa_icon": "fas fa-cog"
                 },
                 "validate_params": {
                     "type": "boolean",

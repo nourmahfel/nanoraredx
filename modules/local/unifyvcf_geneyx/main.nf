@@ -21,13 +21,13 @@ process UNIFYVCF {
     script:
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}"
-    
+
     // Handle optional VCF inputs - check if files exist and are not empty
     def sv_arg = sv_vcf  ? "-s ${sv_vcf}" : ''
     def cnv_arg = cnv_vcf ? "-c ${cnv_vcf}" : ''
     def repeat_arg = repeat_vcf ? "-r ${repeat_vcf}" : ''
     def modify_repeats_arg = modify_repeats ? '-modify' : ''
-    
+
     """
     ONTUnifyVcf.py \\
         -o ${prefix}_unify.vcf \\
