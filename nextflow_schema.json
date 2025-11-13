@@ -58,19 +58,12 @@
                     "pattern": "^\\S+\\.txt$",
                     "fa_icon": "fas fa-file-alt"
                 },
-                "align_with_fastq": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Align FASTQ files to reference genome using minimap2.",
-                    "fa_icon": "fas fa-align-left",
-                    "help_text": "Enable this option when you have raw FASTQ files that need to be aligned to a reference genome."
-                },
-                "align_with_bam": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Convert unaligned BAM files to FASTQ and align to reference genome.",
-                    "fa_icon": "fas fa-file-archive",
-                    "help_text": "Enable this option when you have unaligned BAM files that need to be converted to FASTQ and then aligned."
+                "input_type": {
+                    "type": "string",
+                    "default": "ubam",
+                    "enum": ["ubam", "fastq", "bam"],
+                    "description": "Input file type.",
+                    "fa_icon": "fas fa-tools"
                 },
                 "sv": {
                     "type": "boolean",

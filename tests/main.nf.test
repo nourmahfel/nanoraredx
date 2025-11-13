@@ -21,8 +21,7 @@ nextflow_pipeline {
                 exclude_bed_hificnv = "${projectDir}/assets/test_data/test.exclude.bed"
 
                 // Main analysis toggles
-                align_with_fastq = true
-                align_with_bam = false
+                input_type = 'fastq'
                 use_winnowmap = false
 
                 // Enable all major analyses
@@ -112,8 +111,7 @@ nextflow_pipeline {
                 exclude_bed_hificnv = "${projectDir}/assets/test_data/test.exclude.bed"
 
                 // BAM alignment workflow
-                align_with_bam = true
-                align_with_fastq = false
+                input_type = 'ubam'
                 use_winnowmap = false
 
                 // Enable subset of analyses for faster testing
@@ -155,50 +153,6 @@ nextflow_pipeline {
         }
     }
 
-    test("Pipeline - minimal analysis (aligned BAM input)") {
-
-        when {
-            params {
-                input = "${projectDir}/assets/samplesheet_test_bam.csv"
-                outdir = "results"
-
-                // Reference files
-                fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
-
-                // Use pre-aligned BAM (no alignment needed)
-                align_with_bam = false
-                align_with_fastq = false
-
-                // Minimal analysis set
-                generate_bam_stats = true
-                generate_coverage = false
-                qc = false
-                sv = true
-                snv = false
-                cnv_hificnv = false
-                cnv_spectre = false
-                str = false
-                phase = false
-                methyl = false
-
-                // SV parameters
-                merge_sv = false
-                filter_sv_pass = false
-                sv_caller = 'sniffles'
-            }
-        }
-
-        then {
-            assertAll(
-                { assert workflow.success },
-                { assert path("${params.outdir}").exists() },
-                { assert path("${params.outdir}/pipeline_info").exists() },
-                { assert path("${params.outdir}/test/bam_stats").exists() },
-                { assert path("${params.outdir}/test/sniffles").exists() }
-            )
-        }
-    }
-
     test("Pipeline - stub mode (full pipeline)") {
 
         options "-stub"
@@ -214,8 +168,7 @@ nextflow_pipeline {
                 exclude_bed_hificnv = "${projectDir}/assets/test_data/test.exclude.bed"
 
                 // Enable all analyses for comprehensive stub testing
-                align_with_fastq = true
-                align_with_bam = false
+                input_type = 'fastq'
                 use_winnowmap = false
                 generate_bam_stats = true
                 generate_coverage = true
@@ -265,13 +218,12 @@ nextflow_pipeline {
 
         when {
             params {
-                input = "${projectDir}/assets/samplesheet_test_bam.csv"
+                input = "${projectDir}/assets/samplesheet_test_ubam.csv"
                 outdir = "results"
                 fasta_file = "${projectDir}/assets/test_data/genome_22/genome_22.fasta"
 
                 // Test conflicting parameters
-                align_with_fastq = true
-                align_with_bam = true  // Should cause validation error
+                input_type = 'fastq'
             }
         }
 

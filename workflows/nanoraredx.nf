@@ -83,11 +83,12 @@ workflow nanoraredx {
                 def sample_id = meta_map.id ?: meta_map.toString()
                 def meta = [id: sample_id]
                 def data = [
-                    ubam: row[1] ?: null,
-                    fastq: row[2] ?: null,
-                    bam: row[3] ?: null,
-                    methyl_bam: row[4] ?: null,
-                    hpo_terms: row[5] ?: null
+                    file_path: row[1],
+                    hpo_terms: row[2] ?: null,
+                    sex: row[3] ?: null,
+                    family_id: row[4] ?: null,
+                    maternal_id: row[5] ?: null,
+                    paternal_id: row[6] ?: null
                 ]
                 return [meta, data]
             } else {
@@ -134,17 +135,16 @@ workflow nanoraredx {
                                DATA PREPROCESSING PIPELINE
 =======================================================================================
 */
-    if (params.align_with_fastq) {
+    if (params.input_type == 'fastq') {
         /*
         ================================================================================
                             FASTQ ALIGNMENT WORKFLOW
         ================================================================================
         */
         // Collect FASTQ files
-        ch_samplesheet.view()
         ch_fastq_files = ch_samplesheet
         .map { meta, data ->
-            def fastq = file(data.fastq)
+            def fastq = file(data.file_path)
 
             if (fastq.isFile() && (fastq.name.endsWith('.fastq.gz') || fastq.name.endsWith('.fq.gz'))) {
                 // Single FASTQ file case
@@ -200,7 +200,7 @@ workflow nanoraredx {
         ch_versions = ch_versions.mix(CAT_FASTQ.out.versions)
     }
 
-    else if (params.align_with_bam) {
+    else if (params.input_type == 'ubam') {
         /*
         ================================================================================
                             ALIGNMENT WORKFLOW (UNALIGNED INPUT)
@@ -211,7 +211,7 @@ workflow nanoraredx {
         // Collect unaligned BAM files
         ch_bam_files = ch_samplesheet
             .map { meta, data ->
-                def bam_input = data.ubam
+                def bam_input = data.file_path
 
                 if (!bam_input) {
             error "No BAM input provided for sample ${meta.id}"
@@ -273,7 +273,7 @@ workflow nanoraredx {
                 tuple(meta, fastq_file)
             }
 
-    } else {
+    } else if (params.input_type == 'bam') {
         /*
         ================================================================================
                             ALIGNED INPUT WORKFLOW (ALIGNED BAM INPUT)
@@ -283,8 +283,8 @@ workflow nanoraredx {
         // For aligned BAM input
         ch_aligned_input = ch_samplesheet
             .map { meta, data ->
-                def bam_file = file(data.bam, checkIfExists: true)
-                def bai_file = file("${data.bam}.bai", checkIfExists: true)
+                def bam_file = file(data.file_path, checkIfExists: true)
+                def bai_file = file("${data.file_path}.bai", checkIfExists: true)
                 return [meta, bam_file, bai_file]
             }
 
@@ -342,23 +342,9 @@ workflow nanoraredx {
     }
 
     if (params.methyl) {
-        if (params.align_with_bam) {
             // Use workflow-generated BAM for methylation analysis
             ch_methyl_input = ch_input_bam
             ch_methyl_input.view()
-        } else {
-            // For align_with_fastq or no alignment: use methylated BAM from path
-            ch_methyl_input = ch_samplesheet
-                .map { meta, data ->
-                    if (!data.methyl_bam) {
-                        error "When --methyl is enabled without --align_with_bam, methyl_bam must be provided in samplesheet for sample ${meta.id}"
-                    }
-                    def bam_file = file(data.methyl_bam, checkIfExists: true)
-                    def bai_file = file("${data.methyl_bam}.bai", checkIfExists: true)
-                    return [meta, bam_file, bai_file]
-                }
-        }
-
         methyl(
             ch_methyl_input,
             ch_fasta_fai,
@@ -717,7 +703,6 @@ if (params.sv) {
             def meta = [id: sample_id]
             tuple(meta, fasta)
             }
-            ch_spectre_test_reference.view()
 
             call_cnv_spectre(
                 params.spectre_test_mosdepth,

@@ -14,81 +14,117 @@
                 "meta": ["id"],
                 "description": "Unique sample identifier"
             },
-            "ubam": {
+            "file_path": {
                 "anyOf": [
                     {
                         "type": "string",
                         "format": "directory-path",
-                        "description": "Directory containing unaligned BAM files"
+                        "description": "Directory containing input files"
                     },
                     {
                         "type": "string",
                         "format": "file-path",
                         "pattern": "^\\S+\\.bam$",
-                        "description": "Single unaligned BAM file"
-                    },
-                    {
-                        "type": "string",
-                        "maxLength": 0,
-                        "description": "Empty string when not used"
-                    }
-                ],
-                "description": "Directory containing unaligned BAM files OR single BAM file for this sample",
-                "help_text": "Either a directory path containing unaligned BAM files OR a single .bam file path. Used when --align_with_bam is enabled."
-            },
-            "fastq": {
-                "anyOf": [
-                    {
-                        "type": "string",
-                        "format": "directory-path",
-                        "description": "Directory containing unaligned BAM files"
+                        "description": "Single BAM file"
                     },
                     {
                         "type": "string",
                         "format": "file-path",
-                        "pattern": "^\\S+\\.fastq.gz$",
-                        "description": "Single unaligned BAM file"
+                        "pattern": "^\\S+\\.fastq\\.gz$",
+                        "description": "Single FASTQ.gz file"
+                    },
+                    {
+                        "type": "string",
+                        "format": "file-path",
+                        "pattern": "^\\S+\\.fq\\.gz$",
+                        "description": "Single FQ.gz file"
+                    }
+                ],
+                "description": "Path to input file or directory",
+                "help_text": "Full path to input file or directory. Can be: (1) A directory containing multiple files of the specified input_type, (2) A single .bam file (for bam or ubam input_type), (3) A single .fastq.gz or .fq.gz file (for fastq input_type). For directories: fastq input_type expects .fastq.gz/.fq.gz files, ubam input_type expects .bam files, bam input_type expects a single .bam file with corresponding .bai index."
+            },
+            "hpo_terms": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^HP:\\d{7}(;HP:\\d{7})*$",
+                        "description": "HPO terms separated by semicolons"
                     },
                     {
                         "type": "string",
                         "maxLength": 0,
-                        "description": "Empty string when not used"
+                        "description": "Empty string when no HPO terms"
                     }
                 ],
-                "description": "Directory containing FASTQ files for this sample or a single FASTQ file",
-                "help_text": "Directory path containing FASTQ files (.fastq.gz or .fq.gz). Used when --align_with_fastq is enabled."
-            },
-            "bam": {
-                "anyOf": [
-                    { "type": "string", "format": "file-path", "pattern": "^\\S+\\.bam$" },
-                    { "type": "string", "maxLength": 0 }
-                ],
-                "description": "Path to pre-aligned BAM file",
-                "help_text": "Full path to a pre-aligned BAM file. The corresponding .bai index file must exist in the same directory. Used when neither --align_with_fastq nor --align_with_bam are enabled."
-            },
-            "methyl_bam": {
-                "anyOf": [
-                    { "type": "string", "format": "file-path", "pattern": "^\\S+\\.bam$" },
-                    { "type": "string", "maxLength": 0 }
-                ],
-                "description": "Path to BAM file with methylation information",
-                "help_text": "Full path to a BAM file containing methylation calls. Required when --methyl is enabled and --align_with_bam is not used. The corresponding .bai index file must exist in the same directory."
-            },
-            "hpo_terms": {
-                "anyOf": [
-                    { "type": "string", "pattern": "^HP:\\d{7}(;HP:\\d{7})*$" },
-                    { "type": "string", "maxLength": 0 }
-                ],
                 "description": "HPO terms for phenotype annotation (optional)",
-                "help_text": "Human Phenotype Ontology terms in the format HP:0000000. Multiple terms should be separated by semicolons. Leave empty if no HPO terms are available."
+                "help_text": "Human Phenotype Ontology terms in the format HP:0000000. Multiple terms should be separated by semicolons. Use 'null' or leave empty if no HPO terms are available."
+            },
+            "sex": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "enum": ["M", "F", "U"],
+                        "description": "Sex: M (Male), F (Female), U (Unknown)"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0,
+                        "description": "Empty string when not specified"
+                    }
+                ],
+                "description": "Sex of the sample (optional)",
+                "help_text": "Sex designation: M for Male, F for Female, U for Unknown. Use 'null' or leave empty if not available."
+            },
+            "family_id": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+$",
+                        "description": "Family identifier"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0,
+                        "description": "Empty string when not specified"
+                    }
+                ],
+                "description": "Family identifier (optional)",
+                "help_text": "Identifier for the family this sample belongs to. Use 'null' or leave empty if not applicable."
+            },
+            "maternal_id": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+$",
+                        "description": "Maternal sample identifier"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0,
+                        "description": "Empty string when not specified"
+                    }
+                ],
+                "description": "Maternal sample identifier (optional)",
+                "help_text": "Sample ID of the maternal sample. Use 'null' or leave empty if not available."
+            },
+            "paternal_id": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "pattern": "^\\S+$",
+                        "description": "Paternal sample identifier"
+                    },
+                    {
+                        "type": "string",
+                        "maxLength": 0,
+                        "description": "Empty string when not specified"
+                    }
+                ],
+                "description": "Paternal sample identifier (optional)",
+                "help_text": "Sample ID of the paternal sample. Use 'null' or leave empty if not available."
             }
         },
-        "required": ["sample_id"],
-        "anyOf": [
-            { "required": ["ubam"], "not": { "properties": { "ubam": { "maxLength": 0 } } } },
-            { "required": ["fastq"], "not": { "properties": { "fastq": { "maxLength": 0 } } } },
-            { "required": ["bam"], "not": { "properties": { "bam": { "maxLength": 0 } } } }
-        ],
+        "required": ["sample_id", "file_path"],
         "additionalProperties": false
     }
 }
