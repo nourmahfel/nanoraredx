@@ -14,6 +14,9 @@ nextflow_workflow {
         options "-stub"
 
         when {
+            params {
+                outdir = "$outputDir"
+            }
             workflow {
                 """
                 // Create dummy files for stub testing
